@@ -2,527 +2,3260 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>C_Studio03 — Charlton Sia Photography</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>LUTStudio — Real-time LUT Preview</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400;1,500;1,600&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,500;0,600;1,500;1,600&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<!-- ZIP export for LUT library backup (optional, degrades gracefully) -->
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js" defer></script>
 <style>
-*,*::before,*::after{margin:0;padding:0;box-sizing:border-box;}
-html{scroll-behavior:smooth;}
+/* ============================================================
+   LUTStudio — Design Tokens
+   ============================================================ */
+:root {
+  --color-bg:            #0A0A0A;
+  --color-surface-1:     #111111;
+  --color-surface-2:     #181818;
+  --color-surface-3:     #1F1F1F;
+  --color-border-subtle: #222222;
+  --color-border:        #2C2C2C;
+  --color-border-strong: #3A3A3A;
 
-:root{
-  --bg:#faf6f1;
-  --text:#3d2b1a;
-  --accent:#d4b896;
-  --surface:#f0e6d3;
-  --muted:#8a7060;
-  --faint:#c4b0a0;
-  --serif:'Cormorant Garamond',Georgia,serif;
-  --sans:'Inter',system-ui,sans-serif;
-  --hh:72px;
-  --ease:cubic-bezier(.4,0,.2,1);
+  --color-text-primary:  #F2F2F2;
+  --color-text-secondary:#8A8A8A;
+  --color-text-muted:    #4A4A4A;
+
+  --color-accent:        #C8A96E;
+  --color-accent-dim:    rgba(200, 169, 110, 0.15);
+  --color-accent-glow:   rgba(200, 169, 110, 0.08);
+
+  --color-success:       #4CAF7D;
+  --color-error:         #E05C5C;
+  --color-warning:       #E8A838;
+
+  --type-xs:   clamp(10px, 1.2vw, 11px);
+  --type-sm:   clamp(11px, 1.4vw, 13px);
+  --type-base: clamp(13px, 1.6vw, 15px);
+  --type-md:   clamp(15px, 2vw,   18px);
+  --type-lg:   clamp(20px, 2.8vw, 28px);
+  --type-xl:   clamp(28px, 4vw,   48px);
+
+  --radius-xs: 3px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-pill: 999px;
+
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out:   cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-spring:   cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  --font-display: "Playfair Display", Georgia, serif;
+  --font-ui: "Inter", -apple-system, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", "SF Mono", Consolas, monospace;
+
+  --topbar-h: 48px;
+  --filmstrip-h: 80px;
+  --panel-w: 240px;
+  --adjust-w: 240px;
 }
 
-body{font-family:var(--sans);background:var(--bg);color:var(--text);overflow-x:hidden;cursor:none;}
-
-::-webkit-scrollbar{width:3px;}
-::-webkit-scrollbar-track{background:var(--bg);}
-::-webkit-scrollbar-thumb{background:var(--accent);}
-
-/* ── CURSOR ── */
-.c-dot,.c-ring{position:fixed;pointer-events:none;z-index:9999;border-radius:50%;transform:translate(-50%,-50%);}
-.c-dot{width:5px;height:5px;background:var(--text);transition:opacity .25s;}
-.c-ring{width:34px;height:34px;border:1px solid var(--accent);z-index:9998;transition:width .35s var(--ease),height .35s var(--ease),opacity .35s;opacity:.6;}
-.c-ring.big{width:58px;height:58px;opacity:.3;}
-
-/* ── HEADER ── */
-header{
-  position:fixed;top:0;left:0;right:0;height:var(--hh);z-index:1000;
-  display:flex;align-items:center;justify-content:space-between;padding:0 56px;
-  transition:background .4s var(--ease),box-shadow .4s var(--ease);
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; overscroll-behavior: none; }
+body {
+  background: var(--color-bg);
+  color: var(--color-text-primary);
+  font-family: var(--font-ui);
+  font-size: var(--type-base);
+  line-height: 1.5;
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
 }
-header.on{background:rgba(250,246,241,.93);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);box-shadow:0 1px 0 var(--accent);}
-.logo{font-family:var(--serif);font-size:19px;font-weight:400;font-style:italic;color:var(--text);text-decoration:none;letter-spacing:.03em;}
-.logo b{font-weight:300;font-style:normal;color:var(--muted);}
-nav{display:flex;align-items:center;gap:36px;}
-nav a{font-family:var(--sans);font-size:10.5px;font-weight:500;color:var(--text);text-decoration:none;letter-spacing:.18em;text-transform:uppercase;position:relative;padding-bottom:2px;transition:color .25s;}
-nav a::after{content:'';position:absolute;bottom:0;left:0;width:0;height:1px;background:var(--accent);transition:width .35s var(--ease);}
-nav a:hover{color:var(--muted);}
-nav a:hover::after{width:100%;}
-.nav-book{font-size:10px;padding:9px 22px;border:1px solid var(--accent);letter-spacing:.16em;transition:background .3s,color .3s;}
-.nav-book:hover{background:var(--accent);color:var(--bg) !important;}
-.nav-book::after{display:none;}
+button { font-family: inherit; cursor: pointer; color: inherit; }
+input, select { font-family: inherit; color: inherit; }
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--color-border); border-radius: var(--radius-pill); }
+::-webkit-scrollbar-thumb:hover { background: var(--color-border-strong); }
+:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
 
-/* ── HERO ── */
-.hero{min-height:100vh;display:grid;grid-template-columns:1fr 1fr;padding-top:var(--hh);overflow:hidden;}
-.hero-txt{display:flex;flex-direction:column;justify-content:center;padding:80px 56px 80px 80px;position:relative;}
-.hero-eye{font-family:var(--sans);font-size:10px;font-weight:500;letter-spacing:.28em;text-transform:uppercase;color:var(--muted);margin-bottom:28px;display:flex;align-items:center;gap:14px;}
-.hero-eye::before{content:'';display:inline-block;width:28px;height:1px;background:var(--accent);}
-h1.hero-h{font-family:var(--serif);font-size:clamp(64px,8.5vw,120px);font-weight:300;line-height:.88;letter-spacing:-.02em;margin-bottom:40px;}
-h1.hero-h em{font-style:italic;color:var(--muted);display:block;}
-.hero-desc{font-family:var(--serif);font-size:19px;font-weight:300;font-style:italic;color:var(--muted);line-height:1.75;max-width:340px;margin-bottom:48px;}
-.hero-actions{display:flex;align-items:center;gap:32px;}
-.btn-fill{font-family:var(--sans);font-size:10px;font-weight:500;letter-spacing:.2em;text-transform:uppercase;color:var(--bg);background:var(--text);padding:13px 34px;text-decoration:none;transition:background .3s;}
-.btn-fill:hover{background:var(--muted);}
-.btn-line{font-family:var(--sans);font-size:10px;font-weight:500;letter-spacing:.15em;text-transform:uppercase;color:var(--muted);text-decoration:none;padding-bottom:2px;border-bottom:1px solid var(--accent);transition:color .25s;}
-.btn-line:hover{color:var(--text);}
-.hero-scrl{position:absolute;bottom:40px;left:80px;display:flex;align-items:center;gap:10px;font-family:var(--sans);font-size:8.5px;letter-spacing:.28em;text-transform:uppercase;color:var(--faint);writing-mode:vertical-lr;transform:rotate(180deg);}
-.hero-scrl::after{content:'';width:1px;height:36px;background:var(--accent);animation:stk 2s ease-in-out infinite;}
-@keyframes stk{0%,100%{opacity:.3;transform:scaleY(.5);transform-origin:bottom;}50%{opacity:1;transform:scaleY(1);transform-origin:bottom;}}
-.hero-img{position:relative;overflow:hidden;}
-.hero-img img{width:100%;height:100%;object-fit:cover;object-position:center top;display:block;transition:transform 8s ease-out;}
-.hero-img:hover img{transform:scale(1.03);}
-
-/* ── MARQUEE ── */
-.marquee{background:var(--surface);padding:17px 0;overflow:hidden;border-top:1px solid var(--accent);border-bottom:1px solid var(--accent);}
-.mq-track{display:flex;width:max-content;animation:mq 28s linear infinite;}
-.mq-track span{font-family:var(--serif);font-size:13px;font-weight:300;font-style:italic;color:var(--muted);letter-spacing:.06em;padding:0 28px;}
-.mq-track span.dot{color:var(--accent);font-style:normal;padding:0 4px;}
-@keyframes mq{from{transform:translateX(0);}to{transform:translateX(-50%);}}
-
-/* ── SECTION COMMON ── */
-.lbl{font-family:var(--sans);font-size:10px;font-weight:500;letter-spacing:.26em;text-transform:uppercase;color:var(--muted);display:flex;align-items:center;gap:10px;margin-bottom:12px;}
-.lbl::before{content:'';width:22px;height:1px;background:var(--accent);}
-.ttl{font-family:var(--serif);font-size:clamp(40px,5.5vw,74px);font-weight:300;line-height:1.0;color:var(--text);}
-.ttl em{font-style:italic;}
-
-.reveal{opacity:0;transform:translateY(36px);transition:opacity .75s var(--ease),transform .75s var(--ease);}
-.reveal.vis{opacity:1;transform:none;}
-
-/* ── PORTFOLIO ── */
-#portfolio{padding:112px 80px;background:var(--bg);}
-.port-head{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:68px;}
-.port-count{font-family:var(--serif);font-size:13px;font-style:italic;color:var(--faint);padding-bottom:6px;}
-
-.port-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;align-items:start;}
-.pi{position:relative;overflow:hidden;cursor:pointer;}
-.pi img{width:100%;height:auto;display:block;transition:transform .65s var(--ease);}
-.pi:hover img{transform:scale(1.04);}
-.pi-over{position:absolute;inset:0;background:linear-gradient(to top,rgba(61,43,26,.72) 0%,transparent 52%);opacity:0;transition:opacity .35s var(--ease);display:flex;align-items:flex-end;padding:22px;}
-.pi:hover .pi-over{opacity:1;}
-.pi-n{font-family:var(--sans);font-size:9px;font-weight:500;letter-spacing:.22em;color:var(--accent);text-transform:uppercase;margin-bottom:3px;}
-.pi-cap{font-family:var(--serif);font-size:16px;font-weight:300;font-style:italic;color:var(--bg);}
-
-/* Asymmetric placements */
-.pi:nth-child(1){grid-column:span 2;}  /* large left  */
-/* 2 → auto col 3 */
-/* 3,4,5 → full row of 3 */
-.pi:nth-child(7){grid-column:2/span 2;} /* large right */
-/* 6 → auto col 1, 7 spans 2-3 */
-/* 8,9,10 → full row of 3 */
-/* 11 → auto col 1 */
-
-/* ── ABOUT ── */
-#about{padding:112px 80px;background:var(--surface);}
-.about-grid{display:grid;grid-template-columns:1fr 1.45fr;gap:96px;align-items:start;}
-.about-img-col{position:relative;}
-.about-frame{position:relative;}
-.about-frame img{width:100%;height:auto;display:block;}
-.about-frame::after{content:'';position:absolute;top:20px;left:20px;right:-20px;bottom:-20px;border:1px solid var(--accent);z-index:-1;}
-.about-txt{padding-top:32px;}
-.pullquote{font-family:var(--serif);font-size:clamp(24px,3.2vw,40px);font-weight:300;font-style:italic;line-height:1.35;color:var(--text);margin-bottom:36px;padding-bottom:36px;border-bottom:1px solid var(--accent);}
-.bio p{font-family:var(--sans);font-size:14.5px;font-weight:300;color:var(--muted);line-height:1.95;margin-bottom:18px;}
-.bio p:last-of-type{margin-bottom:36px;}
-.about-facts{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:48px;padding-top:40px;border-top:1px solid var(--accent);}
-.fnum{font-family:var(--serif);font-size:48px;font-weight:300;color:var(--text);line-height:1;}
-.flbl{font-family:var(--sans);font-size:9.5px;font-weight:500;letter-spacing:.2em;text-transform:uppercase;color:var(--muted);margin-top:4px;}
-
-/* ── SERVICES ── */
-#services{padding:112px 80px;background:var(--bg);}
-.svc-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:36px;margin-top:64px;}
-.svc{padding:48px 40px;background:var(--surface);position:relative;transition:transform .4s var(--ease);overflow:hidden;}
-.svc::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--accent);transform:scaleX(0);transform-origin:left;transition:transform .45s var(--ease);}
-.svc:hover::before{transform:scaleX(1);}
-.svc:hover{transform:translateY(-5px);}
-.svc-n{font-family:var(--serif);font-size:12px;font-style:italic;color:var(--accent);margin-bottom:22px;}
-.svc-name{font-family:var(--serif);font-size:28px;font-weight:300;font-style:italic;color:var(--text);margin-bottom:14px;line-height:1.2;}
-.svc-desc{font-family:var(--sans);font-size:13.5px;font-weight:300;color:var(--muted);line-height:1.9;margin-bottom:32px;}
-.svc-price{font-family:var(--sans);font-size:9.5px;font-weight:500;letter-spacing:.2em;text-transform:uppercase;color:var(--muted);border-top:1px solid var(--accent);padding-top:18px;}
-
-/* ── CONTACT ── */
-#contact{padding:112px 80px;background:var(--surface);}
-.contact-grid{display:grid;grid-template-columns:1fr 1.25fr;gap:96px;align-items:start;}
-.contact-inf{display:flex;flex-direction:column;gap:0;}
-.contact-inf .lbl{margin-bottom:12px;}
-.contact-h{font-family:var(--serif);font-size:clamp(40px,5vw,68px);font-weight:300;line-height:1.05;color:var(--text);margin-bottom:28px;}
-.contact-h em{font-style:italic;}
-.contact-desc{font-family:var(--sans);font-size:14.5px;font-weight:300;color:var(--muted);line-height:1.95;margin-bottom:48px;max-width:360px;}
-.c-details{display:flex;flex-direction:column;gap:20px;}
-
-.c-lbl{font-family:var(--sans);font-size:8.5px;font-weight:500;letter-spacing:.26em;text-transform:uppercase;color:var(--faint);margin-bottom:3px;}
-.c-val{font-family:var(--serif);font-size:18px;font-weight:300;font-style:italic;color:var(--text);text-decoration:none;transition:color .25s;}
-a.c-val:hover{color:var(--muted);}
-
-.cform{display:flex;flex-direction:column;gap:20px;}
-.frow{display:grid;grid-template-columns:1fr 1fr;gap:20px;}
-.fg{display:flex;flex-direction:column;gap:6px;}
-.fg label{font-family:var(--sans);font-size:8.5px;font-weight:500;letter-spacing:.26em;text-transform:uppercase;color:var(--muted);}
-.fg input,.fg textarea,.fg select{
-  background:transparent;border:none;border-bottom:1px solid var(--accent);
-  color:var(--text);font-family:var(--serif);font-size:17px;font-weight:300;font-style:italic;
-  padding:9px 0;outline:none;width:100%;resize:none;
-  -webkit-appearance:none;appearance:none;border-radius:0;
-  transition:border-color .3s;
+/* ============================================================
+   App Shell
+   ============================================================ */
+#app {
+  display: grid;
+  grid-template-rows: var(--topbar-h) 1fr;
+  height: 100dvh;
+  width: 100vw;
 }
-.fg input:focus,.fg textarea:focus,.fg select:focus{border-bottom-color:var(--text);}
-.fg input::placeholder,.fg textarea::placeholder{color:var(--faint);}
-.fg textarea{min-height:110px;}
-.fg select option{background:var(--bg);font-style:normal;}
-.fsub{margin-top:8px;align-self:flex-start;}
-
-/* ── FOOTER ── */
-footer{background:var(--text);padding:56px 80px;}
-.foot-in{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:20px;}
-.foot-logo{font-family:var(--serif);font-size:20px;font-weight:300;font-style:italic;color:var(--bg);}
-.foot-copy{font-family:var(--sans);font-size:10px;font-weight:300;letter-spacing:.14em;color:var(--accent);}
-.foot-nav{display:flex;gap:24px;}
-.foot-nav a{font-family:var(--sans);font-size:9px;font-weight:500;letter-spacing:.2em;text-transform:uppercase;color:rgba(250,246,241,.45);text-decoration:none;transition:color .25s;}
-.foot-nav a:hover{color:var(--accent);}
-
-/* ── LIGHTBOX ── */
-#lb{display:none;position:fixed;inset:0;z-index:5000;background:rgba(30,18,8,.94);align-items:center;justify-content:center;padding:32px;}
-#lb.open{display:flex;}
-#lb-img{max-height:90vh;max-width:88vw;object-fit:contain;box-shadow:0 40px 120px rgba(0,0,0,.5);}
-.lb-x{position:absolute;top:28px;right:36px;background:none;border:none;font-family:var(--sans);font-size:9px;font-weight:500;letter-spacing:.22em;text-transform:uppercase;color:var(--accent);cursor:pointer;padding:6px 0;}
-.lb-a{position:absolute;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-family:var(--serif);font-size:48px;color:rgba(212,184,150,.5);transition:color .25s;padding:12px;line-height:1;}
-.lb-a:hover{color:var(--accent);}
-.lb-p{left:20px;} .lb-nx{right:20px;}
-
-/* ── RESPONSIVE ── */
-@media(max-width:1080px){
-  header{padding:0 32px;}
-  .hero{grid-template-columns:1fr;}
-  .hero-img{height:55vh;}
-  .hero-img img{object-fit:cover;}
-  .hero-txt{padding:56px 40px;}
-  .hero-scrl{display:none;}
-  #portfolio,#about,#services,#contact{padding:80px 40px;}
-  footer{padding:44px 40px;}
-  .about-grid,.contact-grid{grid-template-columns:1fr;gap:56px;}
-  .about-frame::after{display:none;}
+#workspace {
+  display: grid;
+  grid-template-columns: var(--panel-w) 1fr var(--adjust-w);
+  min-height: 0;
+  position: relative;
 }
-@media(max-width:768px){
-  header{padding:0 20px;}
-  nav a:not(.nav-book){display:none;}
-  .hero-txt{padding:40px 20px;}
-  .port-grid{grid-template-columns:repeat(2,1fr);}
-  .pi:nth-child(n){grid-column:auto;}
-  .pi:nth-child(1){grid-column:1/-1;}
-  .pi:nth-child(6){grid-column:1/-1;}
-  .svc-grid{grid-template-columns:1fr;}
-  .frow{grid-template-columns:1fr;}
-  #portfolio,#about,#services,#contact{padding:60px 20px;}
-  footer{padding:36px 20px;}
-  .foot-nav,.foot-copy{display:none;}
-  .foot-in{justify-content:center;}
-  .port-head{flex-direction:column;align-items:flex-start;gap:4px;}
+#workspace.panel-collapsed                  { grid-template-columns: 0 1fr var(--adjust-w); }
+#workspace.adjust-collapsed                 { grid-template-columns: var(--panel-w) 1fr 0; }
+#workspace.panel-collapsed.adjust-collapsed { grid-template-columns: 0 1fr 0; }
+#main-col {
+  display: grid;
+  grid-template-rows: 1fr var(--filmstrip-h);
+  min-width: 0;
+  min-height: 0;
 }
-@media(max-width:480px){
-  .port-grid{grid-template-columns:1fr;}
-  .pi:nth-child(n){grid-column:1/-1;}
+
+/* ============================================================
+   Topbar
+   ============================================================ */
+#topbar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 0 16px;
+  background: rgba(10,10,10,0.85);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-bottom: 1px solid var(--color-border-subtle);
+  position: sticky; top: 0; z-index: 100;
+}
+.logo {
+  font-size: 18px;
+  letter-spacing: 0.01em;
+  user-select: none;
+  white-space: nowrap;
+}
+.logo em { font-family: var(--font-display); font-style: italic; font-weight: 600; color: var(--color-accent); }
+.logo span { font-weight: 300; color: var(--color-text-primary); }
+#active-lut-label {
+  font-size: var(--type-sm);
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 220px;
+}
+#active-lut-label b { color: var(--color-text-primary); font-weight: 500; }
+
+.strength-wrap { display: flex; align-items: center; gap: 10px; min-width: 180px; flex: 0 1 280px; }
+.strength-wrap label {
+  font-size: var(--type-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-text-secondary);
+}
+.strength-value {
+  font-family: var(--font-mono);
+  font-feature-settings: "tnum" 1;
+  font-size: var(--type-sm);
+  color: var(--color-accent);
+  min-width: 44px;
+  text-align: right;
+}
+
+input[type=range] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 3px;
+  background: linear-gradient(to right, var(--color-accent) var(--pct, 50%), var(--color-border) var(--pct, 50%));
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+}
+input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px; height: 14px;
+  background: var(--color-accent);
+  border-radius: 50%;
+  box-shadow: 0 0 0 3px var(--color-accent-dim);
+  transition: box-shadow 120ms var(--ease-in-out);
+}
+input[type=range]::-webkit-slider-thumb:hover { box-shadow: 0 0 0 6px var(--color-accent-dim); }
+input[type=range]::-moz-range-thumb {
+  width: 14px; height: 14px; border: none;
+  background: var(--color-accent);
+  border-radius: 50%;
+  box-shadow: 0 0 0 3px var(--color-accent-dim);
+}
+
+.view-modes { display: flex; gap: 2px; background: var(--color-surface-2); border: 1px solid var(--color-border); border-radius: var(--radius-pill); padding: 2px; }
+.view-modes button {
+  background: transparent; border: none;
+  padding: 4px 12px;
+  border-radius: var(--radius-pill);
+  font-size: var(--type-xs);
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  color: var(--color-text-secondary);
+  transition: background 120ms var(--ease-in-out), color 120ms var(--ease-in-out);
+}
+.view-modes button.active { background: var(--color-accent); color: #0A0A0A; }
+.view-modes button:not(.active):hover { color: var(--color-text-primary); }
+
+.topbar-spacer { flex: 1; }
+.topbar-actions { display: flex; gap: 8px; align-items: center; }
+
+/* Buttons */
+.btn-primary {
+  background: var(--color-accent);
+  color: #0A0A0A;
+  font-weight: 600;
+  font-size: var(--type-sm);
+  letter-spacing: 0.02em;
+  padding: 8px 16px;
+  border-radius: var(--radius-sm);
+  border: none;
+  transition: filter 150ms var(--ease-in-out), transform 80ms var(--ease-in-out);
+}
+.btn-primary:hover { filter: brightness(1.1); }
+.btn-primary:active { transform: scale(0.97); filter: brightness(0.9); }
+.btn-ghost {
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: var(--type-sm);
+  border: 1px solid var(--color-border);
+  padding: 7px 14px;
+  border-radius: var(--radius-sm);
+  transition: border-color 120ms var(--ease-in-out), color 120ms var(--ease-in-out), transform 80ms;
+}
+.btn-ghost:hover { border-color: var(--color-accent); color: var(--color-text-primary); }
+.btn-ghost:active { transform: scale(0.97); }
+.btn-icon {
+  width: 32px; height: 32px;
+  background: transparent;
+  border-radius: var(--radius-xs);
+  border: none;
+  color: var(--color-text-secondary);
+  display: grid; place-items: center;
+  font-size: 15px;
+  position: relative;
+  transition: background 100ms var(--ease-in-out), color 100ms var(--ease-in-out);
+}
+.btn-icon:hover { background: var(--color-surface-3); color: var(--color-text-primary); }
+.btn-icon.active { color: var(--color-accent); background: var(--color-accent-dim); }
+/* Dot indicator — shown when any adjustment is non-zero */
+#btn-toggle-adjust.has-adjust::after {
+  content: "";
+  position: absolute;
+  top: 4px; right: 4px;
+  width: 6px; height: 6px;
+  background: var(--color-accent);
+  border-radius: 50%;
+  box-shadow: 0 0 5px var(--color-accent);
+}
+
+/* ============================================================
+   LUT Library Panel
+   ============================================================ */
+#lut-panel {
+  display: flex;
+  flex-direction: column;
+  background: var(--color-surface-1);
+  border-right: 1px solid var(--color-border-subtle);
+  min-height: 0;
+  overflow: hidden;
+  position: relative;
+  transition: transform 280ms var(--ease-out-expo);
+}
+.panel-head {
+  position: sticky; top: 0; z-index: 5;
+  padding: 12px;
+  background: rgba(17,17,17,0.8);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+.panel-title-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.panel-title {
+  font-size: var(--type-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-text-secondary);
+  font-weight: 500;
+}
+#lut-search {
+  width: 100%;
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 7px 10px;
+  font-size: var(--type-sm);
+  color: var(--color-text-primary);
+  transition: border-color 120ms var(--ease-in-out);
+}
+#lut-search::placeholder { color: var(--color-text-muted); }
+#lut-search:focus { border-color: var(--color-accent); outline: none; }
+.tag-chips { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+.chip {
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  padding: 3px 10px;
+  font-size: var(--type-xs);
+  color: var(--color-text-secondary);
+  transition: all 120ms var(--ease-in-out);
+}
+.chip:hover { border-color: var(--color-border-strong); color: var(--color-text-primary); }
+.chip.active { background: var(--color-accent-dim); border-color: var(--color-accent); color: var(--color-accent); }
+
+#lut-list { flex: 1; overflow-y: auto; padding: 8px; display: flex; flex-direction: column; gap: 4px; }
+.lut-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 56px;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  border-left: 3px solid transparent;
+  background: transparent;
+  cursor: pointer;
+  position: relative;
+  user-select: none;
+  transition: background 100ms var(--ease-in-out);
+}
+.lut-card:hover { background: rgba(255,255,255,0.04); }
+.lut-card.selected {
+  border-left: 3px solid var(--color-accent);
+  background: var(--color-accent-glow);
+  box-shadow: inset 3px 0 0 var(--color-accent);
+}
+.lut-card.error-card { opacity: 0.7; }
+.lut-thumb {
+  width: 48px; height: 32px;
+  object-fit: cover;
+  border-radius: var(--radius-xs);
+  background: var(--color-surface-3);
+  flex-shrink: 0;
+}
+.lut-info { flex: 1; min-width: 0; }
+.lut-name {
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 140px;
+}
+.lut-name input {
+  background: var(--color-surface-3);
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius-xs);
+  font-size: 13px;
+  padding: 1px 4px;
+  width: 100%;
+}
+.lut-meta {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--color-text-muted);
+  margin-top: 1px;
+}
+.lut-meta .badge {
+  display: inline-block;
+  padding: 0 5px;
+  border-radius: var(--radius-xs);
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  margin-right: 5px;
+  vertical-align: 1px;
+}
+.badge-3d { background: rgba(200,169,110,0.18); color: var(--color-accent); }
+.badge-1d { background: rgba(76,175,125,0.18); color: var(--color-success); }
+.badge-hald { background: rgba(110,160,220,0.18); color: #7BA7E0; }
+.badge-err { background: rgba(224,92,92,0.18); color: var(--color-error); }
+.lut-actions { display: flex; gap: 2px; opacity: 0; transition: opacity 100ms var(--ease-in-out); }
+.lut-card:hover .lut-actions { opacity: 1; }
+.lut-actions .btn-icon { width: 26px; height: 26px; font-size: 13px; }
+.lut-card .fav-on { color: var(--color-accent); opacity: 1; }
+.lut-card.dragging { opacity: 0.4; }
+.panel-foot {
+  padding: 10px 12px;
+  border-top: 1px solid var(--color-border-subtle);
+  display: flex;
+  gap: 8px;
+}
+.panel-foot .btn-ghost { flex: 1; padding: 6px 8px; font-size: var(--type-xs); }
+.lut-empty {
+  padding: 24px 16px;
+  text-align: center;
+  color: var(--color-text-muted);
+  font-size: var(--type-sm);
+}
+#panel-resizer {
+  position: absolute;
+  top: 0; bottom: 0;
+  left: calc(var(--panel-w) - 3px);
+  width: 6px;
+  cursor: col-resize;
+  z-index: 20;
+}
+#panel-resizer:hover { background: var(--color-accent-dim); }
+
+/* ============================================================
+   Adjustments Panel (mirrors LUT panel structure)
+   ============================================================ */
+#adjust-panel {
+  display: flex;
+  flex-direction: column;
+  background: var(--color-surface-1);
+  border-left: 1px solid var(--color-border-subtle);
+  min-height: 0;
+  overflow: hidden;
+  position: relative;
+  transition: transform 280ms var(--ease-out-expo);
+}
+#adjust-list { flex: 1; overflow-y: auto; padding: 4px 0 8px; }
+.adj-group-title {
+  font-size: var(--type-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-text-muted);
+  font-weight: 500;
+  padding: 14px 12px 4px;
+}
+.adj-group-title:first-child { padding-top: 8px; }
+.adj-row { padding: 7px 12px 8px; }
+.adj-label-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 7px; }
+.adj-label-row label {
+  font-size: var(--type-sm);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  user-select: none;
+}
+.adj-label-row label:hover { color: var(--color-text-primary); }
+.adj-row.modified .adj-label-row label { color: var(--color-text-primary); }
+.adj-val {
+  font-family: var(--font-mono);
+  font-feature-settings: "tnum" 1;
+  font-size: 11px;
+  color: var(--color-text-muted);
+  min-width: 48px;
+  text-align: right;
+}
+.adj-row.modified .adj-val { color: var(--color-accent); }
+
+/* Tabs inside the mobile bottom sheet (LUT Library / Adjustments) */
+.sheet-tabs { display: none; gap: 4px; padding: 8px 12px 0; }
+.sheet-tabs button {
+  flex: 1;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  padding: 8px 4px;
+  font-size: var(--type-sm);
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  color: var(--color-text-secondary);
+  transition: color 120ms var(--ease-in-out), border-color 120ms var(--ease-in-out);
+}
+.sheet-tabs button.active { color: var(--color-accent); border-bottom-color: var(--color-accent); }
+
+/* ============================================================
+   Canvas Stage
+   ============================================================ */
+#stage {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  background: var(--color-bg);
+  overflow: hidden;
+  touch-action: none;
+}
+#gl-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+#stage.drag-over::after {
+  content: "";
+  position: absolute; inset: 8px;
+  border: 2px dashed var(--color-accent);
+  border-radius: var(--radius-md);
+  background: var(--color-accent-glow);
+  pointer-events: none;
+  z-index: 30;
+}
+
+/* Split handle */
+#split-handle {
+  position: absolute;
+  top: 0; bottom: 0;
+  width: 24px;
+  margin-left: -12px;
+  cursor: ew-resize;
+  z-index: 12;
+  display: none;
+}
+#split-handle::before {
+  content: "";
+  position: absolute;
+  top: 0; bottom: 0;
+  left: 50%;
+  width: 4px;
+  margin-left: -2px;
+  background: rgba(242,242,242,0.85);
+  border-radius: var(--radius-pill);
+  transition: background 120ms var(--ease-in-out), box-shadow 120ms var(--ease-in-out);
+}
+#split-handle::after {
+  content: "◂ ▸";
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
+  font-size: 9px;
+  letter-spacing: 2px;
+  padding: 6px 7px 6px 9px;
+  border-radius: var(--radius-pill);
+  white-space: nowrap;
+}
+#split-handle:hover::before, #split-handle.dragging::before {
+  background: var(--color-accent);
+  box-shadow: 0 0 12px var(--color-accent-dim), 0 0 0 1px var(--color-accent);
+  animation: handle-pulse 2s var(--ease-in-out) infinite;
+}
+@keyframes handle-pulse {
+  0%, 100% { box-shadow: 0 0 8px rgba(200,169,110,0.3); }
+  50%      { box-shadow: 0 0 16px rgba(200,169,110,0.6); }
+}
+.split-label {
+  position: absolute;
+  top: 16px;
+  font-size: var(--type-xs);
+  letter-spacing: 0.08em;
+  font-weight: 500;
+  color: var(--color-text-primary);
+  background: rgba(10,10,10,0.6);
+  backdrop-filter: blur(8px);
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--color-border-subtle);
+  z-index: 11;
+  pointer-events: none;
+  transition: opacity 600ms var(--ease-in-out);
+}
+#label-before { left: 16px; }
+#label-after { right: 16px; }
+.split-label.faded { opacity: 0; }
+
+/* Floating info overlay */
+#canvas-info {
+  position: absolute;
+  left: 16px; bottom: 16px;
+  z-index: 11;
+  background: rgba(17,17,17,0.7);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+  font-family: var(--font-mono);
+  font-feature-settings: "tnum" 1;
+  font-size: 11px;
+  color: var(--color-text-secondary);
+  pointer-events: none;
+  transition: opacity 800ms var(--ease-in-out);
+  max-width: min(70%, 420px);
+}
+#canvas-info.faded { opacity: 0.3; }
+#canvas-info b { color: var(--color-accent); font-weight: 500; }
+
+/* Grid labels for 2x2 */
+.grid-label {
+  position: absolute;
+  z-index: 11;
+  font-size: var(--type-xs);
+  font-family: var(--font-mono);
+  color: var(--color-text-primary);
+  background: rgba(10,10,10,0.65);
+  backdrop-filter: blur(6px);
+  border: 1px solid var(--color-border-subtle);
+  padding: 3px 8px;
+  border-radius: var(--radius-xs);
+  pointer-events: none;
+}
+
+/* Histogram */
+#histogram-wrap {
+  position: absolute;
+  right: 16px; bottom: 16px;
+  z-index: 12;
+  background: rgba(17,17,17,0.8);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.7), 0 2px 8px rgba(0,0,0,0.5);
+  overflow: hidden;
+  transform-origin: bottom right;
+  transition: transform 280ms var(--ease-out-expo), opacity 280ms var(--ease-out-expo);
+}
+#histogram-wrap.hidden { transform: scale(0.9) translateY(8px); opacity: 0; pointer-events: none; }
+#histogram-wrap header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 6px 6px 6px 12px;
+  font-size: var(--type-xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+}
+#histogram-canvas { display: block; width: 256px; height: 96px; background: #0D0D0D; }
+
+/* Video controls */
+#video-controls {
+  position: absolute;
+  left: 50%; bottom: 16px;
+  transform: translateX(-50%);
+  z-index: 12;
+  display: none;
+  align-items: center;
+  gap: 8px;
+  background: rgba(17,17,17,0.8);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  padding: 6px 12px;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.6);
+}
+#video-controls.visible { display: flex; }
+#scrub { width: clamp(120px, 26vw, 320px); }
+#video-time {
+  font-family: var(--font-mono);
+  font-feature-settings: "tnum" 1;
+  font-size: 11px;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+}
+#btn-loop.on { color: var(--color-accent); }
+
+/* Empty state */
+#empty-state {
+  position: absolute; inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  z-index: 10;
+  padding: 24px;
+  text-align: center;
+}
+#empty-drop {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 48px clamp(24px, 8vw, 80px);
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+  position: relative;
+}
+#empty-drop svg.dash-border {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  pointer-events: none;
+}
+#empty-drop svg.dash-border rect {
+  fill: none;
+  stroke: var(--color-accent);
+  stroke-opacity: 0.3;
+  stroke-width: 1.5;
+  stroke-dasharray: 14 10;
+  rx: 16;
+  animation: dash-travel 4s linear infinite;
+}
+@keyframes dash-travel { to { stroke-dashoffset: -96; } }
+.empty-icon { font-size: 64px; line-height: 1; opacity: 0.85; }
+.empty-title {
+  font-family: var(--font-display);
+  font-size: var(--type-xl);
+  font-weight: 500;
+  line-height: 1.2;
+}
+.empty-title em { font-style: italic; color: var(--color-accent); }
+.empty-tag { font-size: var(--type-sm); color: var(--color-text-secondary); max-width: 380px; }
+
+/* ============================================================
+   Filmstrip
+   ============================================================ */
+#filmstrip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  background: var(--color-surface-1);
+  border-top: 1px solid var(--color-border-subtle);
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+}
+.film-thumb {
+  position: relative;
+  width: 112px; height: 68px;
+  flex-shrink: 0;
+  border-radius: 4px;
+  overflow: hidden;
+  background: var(--color-surface-3);
+  border: none;
+  padding: 0;
+  transition: transform 120ms var(--ease-in-out), box-shadow 120ms var(--ease-in-out);
+}
+.film-thumb img, .film-thumb canvas { width: 100%; height: 100%; object-fit: cover; display: block; }
+.film-thumb:hover { transform: scale(1.03); }
+.film-thumb.active { box-shadow: 0 0 0 2px var(--color-accent); }
+.film-badge {
+  position: absolute;
+  top: 4px; right: 4px;
+  font-family: var(--font-mono);
+  font-size: 8px;
+  letter-spacing: 0.06em;
+  background: rgba(10,10,10,0.75);
+  color: var(--color-text-primary);
+  padding: 1px 5px;
+  border-radius: var(--radius-xs);
+}
+.film-badge.raw { color: var(--color-accent); }
+.film-badge.vid { color: #7BA7E0; }
+.film-add {
+  width: 112px; height: 68px;
+  flex-shrink: 0;
+  border: 1px dashed var(--color-border-strong);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: var(--type-xs);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  transition: border-color 120ms, color 120ms;
+}
+.film-add:hover { border-color: var(--color-accent); color: var(--color-accent); }
+.film-add .plus { font-size: 18px; line-height: 1; }
+
+/* Context menu */
+#ctx-menu {
+  position: fixed;
+  z-index: 400;
+  min-width: 160px;
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.7), 0 2px 8px rgba(0,0,0,0.5);
+  padding: 4px;
+  display: none;
+}
+#ctx-menu button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: none;
+  padding: 7px 12px;
+  font-size: var(--type-sm);
+  color: var(--color-text-primary);
+  border-radius: var(--radius-xs);
+}
+#ctx-menu button:hover { background: var(--color-surface-3); }
+#ctx-menu button.danger { color: var(--color-error); }
+
+/* ============================================================
+   Toasts
+   ============================================================ */
+#toasts {
+  position: fixed;
+  bottom: 24px; right: 24px;
+  z-index: 500;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: min(360px, calc(100vw - 32px));
+}
+.toast {
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 4px 24px rgba(0,0,0,0.6);
+  padding: 12px 16px 14px;
+  font-size: var(--type-sm);
+  position: relative;
+  overflow: hidden;
+  animation: toast-in 300ms var(--ease-spring);
+}
+.toast.out { animation: toast-out 200ms var(--ease-in-out) forwards; }
+@keyframes toast-in { from { transform: translateY(16px); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes toast-out { to { transform: translateY(8px); opacity: 0; } }
+.toast .toast-title { font-weight: 600; margin-bottom: 2px; font-size: var(--type-sm); }
+.toast .toast-msg { color: var(--color-text-secondary); font-size: var(--type-xs); line-height: 1.45; }
+.toast .progress {
+  position: absolute;
+  left: 0; bottom: 0;
+  height: 2px;
+  background: var(--color-accent);
+  animation: toast-progress linear forwards;
+}
+@keyframes toast-progress { from { width: 100%; } to { width: 0%; } }
+.toast.success .progress { background: var(--color-success); }
+.toast.error .progress { background: var(--color-error); }
+.toast.warning .progress { background: var(--color-warning); }
+
+/* ============================================================
+   Modals
+   ============================================================ */
+.modal-backdrop {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.6);
+  backdrop-filter: blur(4px);
+  z-index: 300;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  opacity: 0;
+  transition: opacity 200ms var(--ease-in-out);
+}
+.modal-backdrop.open { display: flex; }
+.modal-backdrop.shown { opacity: 1; }
+.modal {
+  background: var(--color-surface-1);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.7), 0 2px 8px rgba(0,0,0,0.5);
+  width: min(440px, 100%);
+  max-height: 85dvh;
+  overflow-y: auto;
+}
+.modal header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 16px 12px;
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+.modal header h2 { font-family: var(--font-display); font-size: var(--type-md); font-weight: 600; }
+.modal .modal-body { padding: 16px; display: flex; flex-direction: column; gap: 16px; }
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field > label { font-size: var(--type-xs); text-transform: uppercase; letter-spacing: 0.08em; color: var(--color-text-secondary); }
+.field select, .field input[type=number] {
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  font-size: var(--type-sm);
+}
+.row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.row .hint { font-size: var(--type-xs); color: var(--color-text-muted); }
+.switch { position: relative; width: 36px; height: 20px; flex-shrink: 0; }
+.switch input { opacity: 0; width: 100%; height: 100%; position: absolute; margin: 0; cursor: pointer; }
+.switch .track {
+  position: absolute; inset: 0;
+  background: var(--color-surface-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  transition: background 150ms var(--ease-in-out);
+  pointer-events: none;
+}
+.switch .track::after {
+  content: "";
+  position: absolute;
+  top: 2px; left: 2px;
+  width: 14px; height: 14px;
+  background: var(--color-text-secondary);
+  border-radius: 50%;
+  transition: transform 150ms var(--ease-out-expo), background 150ms;
+}
+.switch input:checked + .track { background: var(--color-accent-dim); border-color: var(--color-accent); }
+.switch input:checked + .track::after { transform: translateX(16px); background: var(--color-accent); }
+.kbd-table { width: 100%; border-collapse: collapse; font-size: var(--type-xs); }
+.kbd-table td { padding: 5px 4px; border-bottom: 1px solid var(--color-border-subtle); color: var(--color-text-secondary); }
+.kbd-table td:first-child { font-family: var(--font-mono); color: var(--color-text-primary); width: 90px; }
+
+/* ============================================================
+   Mobile FAB + bottom sheet behavior
+   ============================================================ */
+#fab-luts {
+  position: fixed;
+  right: 16px;
+  bottom: calc(var(--filmstrip-h) + 16px);
+  z-index: 200;
+  width: 52px; height: 52px;
+  border-radius: 50%;
+  border: none;
+  background: var(--color-accent);
+  color: #0A0A0A;
+  font-size: 20px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.7), 0 0 12px var(--color-accent-dim);
+  display: none;
+  place-items: center;
+  transition: transform 150ms var(--ease-spring);
+}
+#fab-luts:active { transform: scale(0.92); }
+#sheet-backdrop {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.5);
+  z-index: 240;
+  display: none;
+  opacity: 0;
+  transition: opacity 250ms var(--ease-in-out);
+}
+#sheet-backdrop.shown { opacity: 1; }
+.sheet-grip {
+  display: none;
+  width: 40px; height: 4px;
+  background: var(--color-border-strong);
+  border-radius: var(--radius-pill);
+  margin: 10px auto 4px;
+  flex-shrink: 0;
+}
+
+/* Mobile strength bar */
+#mobile-strength {
+  display: none;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  background: var(--color-surface-1);
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+/* Hidden inputs / helpers */
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+#hidden-video { display: none; }
+
+/* ============================================================
+   Responsive
+   ============================================================ */
+@media (max-width: 1279px) {
+  :root { --panel-w: 200px; --adjust-w: 200px; --filmstrip-h: 72px; }
+  #active-lut-label { max-width: 140px; }
+}
+
+@media (max-width: 1023px) {
+  /* Tablet: LUT + Adjustments panels become a single tabbed bottom sheet.
+     List collapse classes explicitly so a persisted desktop-collapse state
+     can't leave the canvas column zero-width here. */
+  #workspace,
+  #workspace.panel-collapsed,
+  #workspace.adjust-collapsed,
+  #workspace.panel-collapsed.adjust-collapsed { grid-template-columns: 1fr; }
+  #panel-resizer { display: none; }
+  #lut-panel, #adjust-panel {
+    position: fixed;
+    left: 0; right: 0; bottom: 0;
+    top: auto;
+    height: auto;
+    max-height: 85dvh;
+    z-index: 250;
+    border-right: none;
+    border-left: none;
+    border-top: 1px solid var(--color-border);
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    transform: translateY(105%);
+    box-shadow: 0 -8px 32px rgba(0,0,0,0.7);
+    transition: transform 350ms var(--ease-spring);
+  }
+  #lut-panel.sheet-open, #adjust-panel.sheet-open { transform: translateY(0); }
+  .sheet-grip { display: block; }
+  .sheet-tabs { display: flex; }
+  #fab-luts { display: grid; }
+  #lut-list { max-height: 50dvh; }
+  #adjust-list { max-height: 56dvh; }
+}
+
+@media (max-width: 767px) {
+  :root { --topbar-h: 52px; }
+  #main-col { grid-template-rows: 1fr auto var(--filmstrip-h); }
+  #mobile-strength { display: flex; }
+  .strength-wrap { display: none; }
+  #active-lut-label { display: none; }
+  .view-modes .vm-grid { display: none; }
+  #histogram-wrap { display: none; }
+  #toasts { right: 50%; transform: translateX(50%); bottom: calc(var(--filmstrip-h) + 70px); }
+  .empty-title { font-size: var(--type-lg); }
+  .topbar-actions .btn-primary { padding: 8px 12px; }
+  #canvas-info { left: 12px; bottom: 12px; font-size: 10px; padding: 6px 9px; }
+}
+
+@media (max-width: 479px) {
+  .view-modes button { padding: 4px 9px; }
+  .topbar-actions .btn-ghost { display: none; }
+}
+
+@media (min-width: 2560px) {
+  :root { --panel-w: 320px; --filmstrip-h: 100px; }
+  .film-thumb { width: 148px; height: 88px; }
+  .lut-thumb { width: 60px; height: 40px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
 }
 </style>
 </head>
 <body>
+<div id="app">
 
-<div class="c-dot" id="cd"></div>
-<div class="c-ring" id="cr"></div>
+  <!-- ===================== TOPBAR ===================== -->
+  <header id="topbar">
+    <button class="btn-icon" id="btn-toggle-panel" title="Toggle LUT library" aria-label="Toggle LUT library">≡</button>
+    <div class="logo"><em>LUT</em><span>Studio</span></div>
+    <div id="active-lut-label">Active LUT: <b id="active-lut-name">None</b></div>
 
-<!-- HEADER -->
-<header id="hdr">
-  <a href="#home" class="logo">C_<b>Studio</b>03</a>
-  <nav>
-    <a href="#portfolio">Work</a>
-    <a href="#about">About</a>
-    <a href="#services">Services</a>
-    <a href="#contact" class="nav-book">Book a Session</a>
-  </nav>
-</header>
-
-<!-- HERO -->
-<section class="hero" id="home">
-  <div class="hero-txt">
-    <div class="hero-eye">Singapore Photography</div>
-    <h1 class="hero-h">Charlton<em>Sia</em></h1>
-    <p class="hero-desc">Capturing the quiet in-between moments — where light, form, and identity become one frame.</p>
-    <div class="hero-actions">
-      <a href="#portfolio" class="btn-fill">View Work</a>
-      <a href="#contact" class="btn-line">Book a session</a>
+    <div class="strength-wrap">
+      <label for="strength">Strength</label>
+      <input type="range" id="strength" min="0" max="200" value="100" step="1" aria-label="LUT strength">
+      <span class="strength-value" id="strength-value">100%</span>
     </div>
-    <div class="hero-scrl">Scroll</div>
-  </div>
-  <div class="hero-img">
-    <img src="../Images/CBE49DE8.jpeg" alt="C_Studio03 — Charlton Sia Photography" id="hero-img">
-  </div>
-</section>
 
-<!-- MARQUEE -->
-<div class="marquee">
-  <div class="mq-track">
-    <span>C_Studio03</span><span class="dot">&middot;</span>
-    <span>Portrait Photography</span><span class="dot">&middot;</span>
-    <span>Editorial</span><span class="dot">&middot;</span>
-    <span>Singapore</span><span class="dot">&middot;</span>
-    <span>Fashion &amp; Lifestyle</span><span class="dot">&middot;</span>
-    <span>Fine Art</span><span class="dot">&middot;</span>
-    <span>Brand Photography</span><span class="dot">&middot;</span>
-    <span>C_Studio03</span><span class="dot">&middot;</span>
-    <span>Portrait Photography</span><span class="dot">&middot;</span>
-    <span>Editorial</span><span class="dot">&middot;</span>
-    <span>Singapore</span><span class="dot">&middot;</span>
-    <span>Fashion &amp; Lifestyle</span><span class="dot">&middot;</span>
-    <span>Fine Art</span><span class="dot">&middot;</span>
-    <span>Brand Photography</span><span class="dot">&middot;</span>
+    <div class="view-modes" role="tablist" aria-label="View mode">
+      <button data-mode="split" class="active">Split</button>
+      <button data-mode="original">Original</button>
+      <button data-mode="graded">Graded</button>
+      <button data-mode="grid" class="vm-grid">2×2 Grid</button>
+    </div>
+
+    <div class="topbar-spacer"></div>
+
+    <div class="topbar-actions">
+      <button class="btn-icon" id="btn-toggle-adjust" title="Toggle adjustments" aria-label="Toggle adjustments">⚗</button>
+      <button class="btn-icon" id="btn-histogram" title="Toggle histogram (H)">▦</button>
+      <button class="btn-ghost" id="btn-export">⬇ Export</button>
+      <button class="btn-icon" id="btn-settings" title="Settings">⚙</button>
+    </div>
+  </header>
+
+  <!-- ===================== WORKSPACE ===================== -->
+  <div id="workspace">
+
+    <!-- LUT Library Panel -->
+    <aside id="lut-panel" aria-label="LUT library">
+      <div class="sheet-grip" id="sheet-grip"></div>
+      <div class="sheet-tabs" role="tablist">
+        <button data-tab="lut" class="active" role="tab">LUT Library</button>
+        <button data-tab="adjust" role="tab">Adjustments</button>
+      </div>
+      <div class="panel-head">
+        <div class="panel-title-row">
+          <span class="panel-title">LUT Library</span>
+          <button class="btn-icon" id="btn-add-lut" title="Add LUT files" style="width:26px;height:26px;">＋</button>
+        </div>
+        <input type="search" id="lut-search" placeholder="Search LUTs…" autocomplete="off">
+        <div class="tag-chips" id="tag-chips">
+          <button class="chip" data-tag="__fav">★ Favorites</button>
+          <button class="chip" data-tag="film">Film</button>
+          <button class="chip" data-tag="cinematic">Cinematic</button>
+          <button class="chip" data-tag="cool">Cool</button>
+          <button class="chip" data-tag="warm">Warm</button>
+          <button class="chip" data-tag="custom">Custom</button>
+        </div>
+      </div>
+      <div id="lut-list" aria-live="polite"></div>
+      <div class="panel-foot">
+        <button class="btn-ghost" id="btn-export-lib" title="Export library as .zip">Export .zip</button>
+        <button class="btn-ghost" id="btn-import-lib" title="Import library .zip">Import</button>
+        <button class="btn-ghost" id="btn-clear-lib" title="Delete all LUTs" style="color:var(--color-error);">Clear</button>
+      </div>
+    </aside>
+    <div id="panel-resizer" title="Drag to resize panel"></div>
+
+    <!-- Main column -->
+    <div id="main-col">
+      <main id="stage">
+        <canvas id="gl-canvas"></canvas>
+
+        <div id="split-handle" aria-label="Drag to compare before and after" role="slider"></div>
+        <span class="split-label" id="label-before">BEFORE</span>
+        <span class="split-label" id="label-after">AFTER</span>
+
+        <div id="canvas-info" class="faded"></div>
+
+        <div id="histogram-wrap" class="hidden">
+          <header>
+            RGB Histogram
+            <button class="btn-icon" id="btn-hist-close" style="width:24px;height:24px;">✕</button>
+          </header>
+          <canvas id="histogram-canvas" width="256" height="96"></canvas>
+        </div>
+
+        <div id="video-controls">
+          <button class="btn-icon" id="btn-frame-back" title="Frame back (←)">⏮</button>
+          <button class="btn-icon" id="btn-play" title="Play/Pause (Space)">▶</button>
+          <button class="btn-icon" id="btn-frame-fwd" title="Frame forward (→)">⏭</button>
+          <input type="range" id="scrub" min="0" max="1000" value="0" aria-label="Scrub video">
+          <span id="video-time">0:00 / 0:00</span>
+          <button class="btn-icon" id="btn-loop" title="Loop">⟳</button>
+          <button class="btn-icon" id="btn-capture" title="Capture frame as PNG">📷</button>
+        </div>
+
+        <div id="empty-state">
+          <div id="empty-drop" role="button" tabindex="0" aria-label="Add media files">
+            <svg class="dash-border" aria-hidden="true"><rect x="1" y="1" width="100%" height="100%" rx="16" style="width:calc(100% - 2px);height:calc(100% - 2px);"/></svg>
+            <div class="empty-icon">◐</div>
+            <h1 class="empty-title">Drop your stills <em>&amp;</em> footage</h1>
+            <p class="empty-tag">LUTs applied in real time — RAW, JPEG, video. Everything stays on this device. Nothing is uploaded anywhere.</p>
+            <button class="btn-primary" id="btn-empty-add">Choose files</button>
+          </div>
+        </div>
+      </main>
+
+      <!-- Mobile strength bar -->
+      <div id="mobile-strength">
+        <label for="m-strength" style="font-size:var(--type-xs);letter-spacing:0.08em;text-transform:uppercase;color:var(--color-text-secondary);">Strength</label>
+        <input type="range" id="m-strength" min="0" max="200" value="100" step="1" aria-label="LUT strength">
+        <span class="strength-value" id="m-strength-value">100%</span>
+      </div>
+
+      <!-- Filmstrip -->
+      <div id="filmstrip" aria-label="Media browser">
+        <button class="film-add" id="btn-add-media"><span class="plus">＋</span><span>Add Media</span></button>
+      </div>
+    </div>
+
+    <!-- Adjustments Panel -->
+    <aside id="adjust-panel" aria-label="Image adjustments">
+      <div class="sheet-grip" id="adjust-grip"></div>
+      <div class="sheet-tabs" role="tablist">
+        <button data-tab="lut" role="tab">LUT Library</button>
+        <button data-tab="adjust" class="active" role="tab">Adjustments</button>
+      </div>
+      <div class="panel-head">
+        <div class="panel-title-row">
+          <span class="panel-title">Adjustments</span>
+          <button class="btn-icon" id="btn-reset-adjust-top" title="Reset all adjustments" style="width:26px;height:26px;font-size:13px;">↺</button>
+        </div>
+      </div>
+      <div id="adjust-list"></div>
+      <div class="panel-foot">
+        <button class="btn-ghost" id="btn-reset-adjust" style="flex:1;">Reset All</button>
+      </div>
+    </aside>
   </div>
 </div>
 
-<!-- PORTFOLIO -->
-<section id="portfolio">
-  <div class="port-head reveal">
-    <div>
-      <div class="lbl">Selected Work</div>
-      <h2 class="ttl">Portfolio</h2>
-    </div>
-    <div class="port-count">11 images &mdash; 2019&ndash;2024</div>
-  </div>
-  <div class="port-grid">
-    <div class="pi reveal" style="transition-delay:.04s">
-      <img src="../Images/14B84896.jpeg" alt="Portrait" loading="lazy">
-      <div class="pi-over"><div><div class="pi-n">01</div><div class="pi-cap">Portrait Series</div></div></div>
-    </div>
-    <div class="pi reveal" style="transition-delay:.08s">
-      <img src="../Images/6490D396.jpeg" alt="Editorial" loading="lazy">
-      <div class="pi-over"><div><div class="pi-n">02</div><div class="pi-cap">Editorial</div></div></div>
-    </div>
-    <div class="pi reveal" style="transition-delay:.12s">
-      <img src="../Images/5344E226.jpeg" alt="Studio" loading="lazy">
-      <div class="pi-over"><div><div class="pi-n">03</div><div class="pi-cap">Studio Work</div></div></div>
-    </div>
-    <div class="pi reveal" style="transition-delay:.16s">
-      <img src="../Images/7D4DD3E6.jpeg" alt="Fashion" loading="lazy">
-      <div class="pi-over"><div><div class="pi-n">04</div><div class="pi-cap">Fashion</div></div></div>
-    </div>
-    <div class="pi reveal" style="transition-delay:.2s">
-      <img src="../Images/606F208C.jpeg" alt="Portrait" loading="lazy">
-      <div class="pi-over"><div><div class="pi-n">05</div><div class="pi-cap">Fine Art Portrait</div></div></div>
-    </div>
-    <div class="pi reveal" style="transition-delay:.24s">
-      <img src="../Images/904692C5.jpeg" alt="Location" loading="lazy">
-      <div class="pi-over"><div><div class="pi-n">06</div><div class="pi-cap">Location</div></div></div>
-    </div>
-    <div class="pi reveal" style="transition-delay:.28s">
-      <img src="../Images/98A2F6E2.jpeg" alt="Editorial" loading="lazy">
-      <div class="pi-over"><div><div class="pi-n">07</div><div class="pi-cap">Dark Editorial</div></div></div>
-    </div>
-    <div class="pi reveal" style="transition-delay:.32s">
-      <img src="../Images/9EAEA4FF.jpeg" alt="Portrait" loading="lazy">
-      <div class="pi-over"><div><div class="pi-n">08</div><div class="pi-cap">Portraiture</div></div></div>
-    </div>
-    <div class="pi reveal" style="transition-delay:.36s">
-      <img src="../Images/D1E5ACDF.jpeg" alt="Lifestyle" loading="lazy">
-      <div class="pi-over"><div><div class="pi-n">09</div><div class="pi-cap">Lifestyle</div></div></div>
-    </div>
-    <div class="pi reveal" style="transition-delay:.4s">
-      <img src="../Images/CBE49DE8.jpeg" alt="Concept" loading="lazy">
-      <div class="pi-over"><div><div class="pi-n">10</div><div class="pi-cap">Concept</div></div></div>
-    </div>
-    <div class="pi reveal" style="transition-delay:.44s">
-      <img src="../Images/8DF74177.jpeg" alt="Fine Art" loading="lazy">
-      <div class="pi-over"><div><div class="pi-n">11</div><div class="pi-cap">Fine Art</div></div></div>
-    </div>
-  </div>
-</section>
+<!-- FAB for mobile/tablet LUT sheet -->
+<button id="fab-luts" title="Open LUT library" aria-label="Open LUT library">🎚</button>
+<div id="sheet-backdrop"></div>
 
-<!-- ABOUT -->
-<section id="about">
-  <div class="about-grid">
-    <div class="about-img-col reveal">
-      <div class="about-frame">
-        <img src="../Images/self_charlton1.jpeg" alt="Charlton Sia">
-      </div>
-    </div>
-    <div class="about-txt reveal" style="transition-delay:.2s">
-      <div class="lbl" style="margin-bottom:16px">About</div>
-      <blockquote class="pullquote">"Every frame is a quiet negotiation between light and what it chooses to reveal."</blockquote>
-      <div class="bio">
-        <p>Charlton Sia is a Singapore-based photographer with a focus on portrait, editorial, and fashion photography. Working under the studio name C_Studio03, his approach is rooted in stillness — finding the unguarded moment within the deliberate.</p>
-        <p>With a background in fine art and over five years of professional practice, Charlton has worked with independent brands, editorial publications, and private clients across Singapore and Southeast Asia.</p>
-        <a href="#contact" class="btn-fill">Work with me</a>
-      </div>
-      <div class="about-facts">
-        <div><div class="fnum">5+</div><div class="flbl">Years of Practice</div></div>
-        <div><div class="fnum">100+</div><div class="flbl">Client Sessions</div></div>
-        <div><div class="fnum">SG</div><div class="flbl">Based in Singapore</div></div>
-        <div><div class="fnum">3</div><div class="flbl">Service Specialties</div></div>
-      </div>
-    </div>
-  </div>
-</section>
+<!-- Toasts -->
+<div id="toasts" aria-live="polite"></div>
 
-<!-- SERVICES -->
-<section id="services">
-  <div class="reveal" style="margin-bottom:64px">
-    <div class="lbl">What I Offer</div>
-    <h2 class="ttl">Services</h2>
-  </div>
-  <div class="svc-grid">
-    <div class="svc reveal" style="transition-delay:.1s">
-      <div class="svc-n">01</div>
-      <div class="svc-name">Portrait Sessions</div>
-      <div class="svc-desc">Studio or location-based portraits for individuals, creatives, and professionals. An intimate, unhurried process built around your comfort and story.</div>
-      <div class="svc-price">From SGD 250 &nbsp;&middot;&nbsp; 1&ndash;2 Hours</div>
-    </div>
-    <div class="svc reveal" style="transition-delay:.2s">
-      <div class="svc-n">02</div>
-      <div class="svc-name">Editorial &amp; Fashion</div>
-      <div class="svc-desc">Collaborative shoots for brands, designers, and publications. From concept to final delivery, with an eye for light, texture, and narrative.</div>
-      <div class="svc-price">From SGD 600 &nbsp;&middot;&nbsp; Half Day</div>
-    </div>
-    <div class="svc reveal" style="transition-delay:.3s">
-      <div class="svc-n">03</div>
-      <div class="svc-name">Brand Photography</div>
-      <div class="svc-desc">Full-day photography for businesses seeking a consistent, elevated visual identity — products, people, spaces, and stories.</div>
-      <div class="svc-price">From SGD 1,200 &nbsp;&middot;&nbsp; Full Day</div>
-    </div>
-  </div>
-</section>
+<!-- Context menu -->
+<div id="ctx-menu"></div>
 
-<!-- CONTACT -->
-<section id="contact">
-  <div class="contact-grid">
-    <div class="contact-inf reveal">
-      <div class="lbl">Get in Touch</div>
-      <h2 class="contact-h">Let&rsquo;s work<em>together</em></h2>
-      <p class="contact-desc">Whether you have a project in mind or simply want to talk — I&rsquo;d love to hear from you. Sessions typically book 2&ndash;4 weeks in advance.</p>
-      <div class="c-details">
-        <div class="c-item">
-          <div class="c-lbl">Email</div>
-          <a href="mailto:hello@cstudio03.com" class="c-val">hello@cstudio03.com</a>
-        </div>
-        <div class="c-item">
-          <div class="c-lbl">Instagram</div>
-          <a href="https://instagram.com" class="c-val" target="_blank" rel="noopener">@cstudio03</a>
-        </div>
-        <div class="c-item">
-          <div class="c-lbl">Based in</div>
-          <span class="c-val">Singapore</span>
-        </div>
-      </div>
-    </div>
-    <form class="cform reveal" style="transition-delay:.2s" onsubmit="onSubmit(event)">
-      <div class="frow">
-        <div class="fg"><label for="fn">Name</label><input type="text" id="fn" placeholder="Your name" required></div>
-        <div class="fg"><label for="fe">Email</label><input type="email" id="fe" placeholder="your@email.com" required></div>
-      </div>
-      <div class="fg">
-        <label for="fs">Session Type</label>
-        <select id="fs">
-          <option value="">Select a service...</option>
-          <option value="portrait">Portrait Session</option>
-          <option value="editorial">Editorial &amp; Fashion</option>
-          <option value="brand">Brand Photography</option>
-          <option value="other">Other</option>
+<!-- Export modal -->
+<div class="modal-backdrop" id="export-modal">
+  <div class="modal" role="dialog" aria-label="Export">
+    <header><h2>Export</h2><button class="btn-icon" data-close>✕</button></header>
+    <div class="modal-body">
+      <div class="field">
+        <label for="export-format">Image format</label>
+        <select id="export-format">
+          <option value="png">PNG (lossless)</option>
+          <option value="jpeg">JPEG</option>
+          <option value="webp">WebP</option>
         </select>
       </div>
-      <div class="fg"><label for="fm">Message</label><textarea id="fm" placeholder="Tell me about your project or vision..."></textarea></div>
-      <div class="fsub"><button type="submit" class="btn-fill">Send Message</button></div>
-    </form>
+      <div class="field" id="jpeg-quality-field" style="display:none;">
+        <label for="export-quality">JPEG quality — <span id="export-quality-val" class="strength-value">92</span></label>
+        <input type="range" id="export-quality" min="50" max="100" value="92">
+      </div>
+      <div class="row">
+        <button class="btn-primary" id="btn-do-export" style="flex:1;">Export current view</button>
+      </div>
+      <div class="row">
+        <button class="btn-ghost" id="btn-export-cube" style="flex:1;">Export active LUT as .cube</button>
+      </div>
+      <div class="row">
+        <button class="btn-ghost" id="btn-export-video" style="flex:1;">Record graded video (.webm)</button>
+      </div>
+      <p class="hint" style="font-size:var(--type-xs);color:var(--color-text-muted);">Video recording captures the live canvas in real time — a 30s clip takes 30s to record. Audio is not included.</p>
+    </div>
   </div>
-</section>
-
-<!-- FOOTER -->
-<footer>
-  <div class="foot-in">
-    <div class="foot-logo">C_Studio03</div>
-    <div class="foot-copy">&copy; 2024 Charlton Sia &nbsp;&middot;&nbsp; All rights reserved</div>
-    <nav class="foot-nav">
-      <a href="#portfolio">Work</a>
-      <a href="#about">About</a>
-      <a href="#services">Services</a>
-      <a href="#contact">Contact</a>
-    </nav>
-  </div>
-</footer>
-
-<!-- LIGHTBOX -->
-<div id="lb">
-  <button class="lb-x" onclick="lbClose()">Close &times;</button>
-  <button class="lb-a lb-p" onclick="lbNav(-1)">&#8249;</button>
-  <img id="lb-img" src="" alt="">
-  <button class="lb-a lb-nx" onclick="lbNav(1)">&#8250;</button>
 </div>
 
+<!-- Settings modal -->
+<div class="modal-backdrop" id="settings-modal">
+  <div class="modal" role="dialog" aria-label="Settings">
+    <header><h2>Settings</h2><button class="btn-icon" data-close>✕</button></header>
+    <div class="modal-body">
+      <div class="row">
+        <div>
+          <div style="font-size:var(--type-sm);font-weight:500;">Apply LUT in linear light</div>
+          <div class="hint">Gamma decode → LUT → encode. For LUTs built for linear input.</div>
+        </div>
+        <label class="switch"><input type="checkbox" id="set-linear"><span class="track"></span></label>
+      </div>
+      <div class="field">
+        <label for="set-default-strength">Default strength — <span id="set-strength-val" class="strength-value">100%</span></label>
+        <input type="range" id="set-default-strength" min="0" max="200" value="100">
+      </div>
+      <div class="row">
+        <div>
+          <div style="font-size:var(--type-sm);font-weight:500;">Renderer</div>
+          <div class="hint" id="renderer-info">—</div>
+        </div>
+      </div>
+      <div class="row">
+        <div>
+          <div style="font-size:var(--type-sm);font-weight:500;">Storage used</div>
+          <div class="hint" id="storage-info">—</div>
+        </div>
+      </div>
+      <div class="field">
+        <label>Keyboard shortcuts</label>
+        <table class="kbd-table">
+          <tr><td>[ / ]</td><td>Cycle LUTs</td></tr>
+          <tr><td>← / →</td><td>Prev / next media (frame-step on video)</td></tr>
+          <tr><td>Space</td><td>Play / pause video</td></tr>
+          <tr><td>S</td><td>Toggle split view</td></tr>
+          <tr><td>E</td><td>Export current view</td></tr>
+          <tr><td>F</td><td>Favorite active LUT</td></tr>
+          <tr><td>H</td><td>Toggle histogram</td></tr>
+          <tr><td>0–9</td><td>Strength 0–90%</td></tr>
+          <tr><td>Ctrl+Z</td><td>Undo LUT / strength change</td></tr>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Hidden file inputs -->
+<input type="file" id="file-lut" class="visually-hidden" multiple
+  accept=".cube,.3dl,.csp,.mga,.m3d,.vf,.lut,.dat,.look,.icc,.icm,.png,.tiff,.tif">
+<input type="file" id="file-media" class="visually-hidden" multiple
+  accept="image/*,video/*,.cr2,.cr3,.crw,.nef,.nrw,.arw,.sr2,.srf,.raf,.dng,.orf,.rw2,.pef,.ptx,.x3f,.rwl,.raw,.3fr,.fff,.iiq,.kdc,.dcr,.mrw,.mef,.mos,.srw,.erf,.heic,.heif,.mov,.mp4,.m4v,.webm,.ogv,.avi,.mkv,.3gp,.ts,.m2ts,.mts,.flv,.wmv,.f4v,.dv">
+<input type="file" id="file-zip" class="visually-hidden" accept=".zip">
+
+<video id="hidden-video" playsinline crossorigin="anonymous"></video>
+
 <script>
-// CURSOR
-const cd = document.getElementById('cd'), cr = document.getElementById('cr');
-let mx=0,my=0,rx=0,ry=0;
-document.addEventListener('mousemove',e=>{
-  mx=e.clientX;my=e.clientY;
-  cd.style.left=mx+'px';cd.style.top=my+'px';
-});
-(function tick(){rx+=(mx-rx)*.1;ry+=(my-ry)*.1;cr.style.left=rx+'px';cr.style.top=ry+'px';requestAnimationFrame(tick);})();
-document.querySelectorAll('a,button,.pi,.svc').forEach(el=>{
-  el.addEventListener('mouseenter',()=>cr.classList.add('big'));
-  el.addEventListener('mouseleave',()=>cr.classList.remove('big'));
-});
+"use strict";
+/* ============================================================
+   LUTStudio — fully client-side LUT preview
+   No file ever leaves this browser.
+   ============================================================ */
 
-// HEADER
-const hdr=document.getElementById('hdr');
-window.addEventListener('scroll',()=>hdr.classList.toggle('on',scrollY>50),{passive:true});
+/* ---------------- Utilities ---------------- */
+const $ = (s, p = document) => p.querySelector(s);
+const $$ = (s, p = document) => [...p.querySelectorAll(s)];
+const uuid = () => (crypto.randomUUID ? crypto.randomUUID() :
+  "xxxx-xxxx-4xxx-yxxx".replace(/[xy]/g, c => {
+    const r = Math.random() * 16 | 0; return (c === "x" ? r : (r & 3 | 8)).toString(16);
+  }));
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const fmtBytes = b => b < 1024 ? b + " B" : b < 1048576 ? (b / 1024).toFixed(1) + " KB" : (b / 1048576).toFixed(1) + " MB";
+const fmtTime = s => {
+  if (!isFinite(s)) return "0:00";
+  const m = Math.floor(s / 60), sec = Math.floor(s % 60);
+  return m + ":" + String(sec).padStart(2, "0");
+};
+const ext = name => (name.match(/\.([^.]+)$/) || [, ""])[1].toLowerCase();
+const escapeHtml = s => s.replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
-// HERO PARALLAX
-const hImg=document.getElementById('hero-img');
-window.addEventListener('scroll',()=>{
-  if(hImg&&scrollY<window.innerHeight)hImg.style.transform='translateY('+scrollY*.25+'px)';
-},{passive:true});
+const RAW_EXTS = new Set(["cr2","cr3","crw","nef","nrw","arw","sr2","srf","raf","dng","orf","rw2","pef","ptx","x3f","rwl","raw","3fr","fff","iiq","kdc","dcr","mrw","mef","mos","srw","erf"]);
+const VIDEO_EXTS = new Set(["mp4","mov","m4v","webm","ogv","avi","mkv","3gp","ts","m2ts","mts","flv","wmv","f4v","dv"]);
+const LUT_EXTS = new Set(["cube","3dl","csp","mga","m3d","vf","lut","dat","look","icc","icm"]);
 
-// REVEAL
-const obs=new IntersectionObserver(entries=>{
-  entries.forEach(e=>{if(e.isIntersecting)e.target.classList.add('vis');});
-},{threshold:.1,rootMargin:'0px 0px -52px 0px'});
-document.querySelectorAll('.reveal').forEach(el=>obs.observe(el));
+/* ---------------- Toasts ---------------- */
+const Toast = (() => {
+  const host = $("#toasts");
+  function show(title, msg = "", type = "info", ms = 4000) {
+    while (host.children.length >= 3) host.firstChild.remove();
+    const el = document.createElement("div");
+    el.className = `toast ${type}`;
+    el.innerHTML = `<div class="toast-title">${escapeHtml(title)}</div>` +
+      (msg ? `<div class="toast-msg">${escapeHtml(msg)}</div>` : "") +
+      `<div class="progress" style="animation-duration:${ms}ms"></div>`;
+    host.appendChild(el);
+    setTimeout(() => { el.classList.add("out"); setTimeout(() => el.remove(), 220); }, ms);
+  }
+  return { show };
+})();
 
-// LIGHTBOX
-const IMGS=[
-  '../Images/14B84896.jpeg','../Images/6490D396.jpeg','../Images/5344E226.jpeg',
-  '../Images/7D4DD3E6.jpeg','../Images/606F208C.jpeg','../Images/904692C5.jpeg',
-  '../Images/98A2F6E2.jpeg','../Images/9EAEA4FF.jpeg','../Images/D1E5ACDF.jpeg',
-  '../Images/CBE49DE8.jpeg','../Images/8DF74177.jpeg',
-];
-let cur=0;
-const lb=document.getElementById('lb'),lbImg=document.getElementById('lb-img');
-document.querySelectorAll('.pi').forEach((c,i)=>{
-  c.addEventListener('click',()=>{cur=i;lbImg.src=IMGS[i];lb.classList.add('open');document.body.style.overflow='hidden';});
-});
-function lbClose(){lb.classList.remove('open');document.body.style.overflow='';}
-function lbNav(d){cur=(cur+d+IMGS.length)%IMGS.length;lbImg.src=IMGS[cur];}
-lb.addEventListener('click',e=>{if(e.target===lb)lbClose();});
-document.addEventListener('keydown',e=>{
-  if(!lb.classList.contains('open'))return;
-  if(e.key==='Escape')lbClose();
-  if(e.key==='ArrowLeft')lbNav(-1);
-  if(e.key==='ArrowRight')lbNav(1);
-});
+/* ---------------- IndexedDB (Database: LUTStudio, v1) ---------------- */
+const DB = (() => {
+  let db = null;
+  function open() {
+    return new Promise((res, rej) => {
+      const req = indexedDB.open("LUTStudio", 1);
+      req.onupgradeneeded = e => {
+        const d = e.target.result;
+        if (!d.objectStoreNames.contains("luts")) d.createObjectStore("luts", { keyPath: "id" });
+        if (!d.objectStoreNames.contains("settings")) d.createObjectStore("settings", { keyPath: "key" });
+      };
+      req.onsuccess = () => { db = req.result; res(db); };
+      req.onerror = () => rej(req.error);
+    });
+  }
+  const tx = (store, mode, fn) => new Promise((res, rej) => {
+    const t = db.transaction(store, mode);
+    const r = fn(t.objectStore(store));
+    t.oncomplete = () => res(r.__results !== undefined ? r.__results : (r.result !== undefined ? r.result : undefined));
+    t.onerror = () => rej(t.error);
+  });
+  return {
+    open,
+    put: (store, val) => tx(store, "readwrite", os => os.put(val)),
+    del: (store, key) => tx(store, "readwrite", os => os.delete(key)),
+    clear: store => tx(store, "readwrite", os => os.clear()),
+    getAll: store => new Promise((res, rej) => {
+      const r = db.transaction(store).objectStore(store).getAll();
+      r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
+    }),
+    get: (store, key) => new Promise((res, rej) => {
+      const r = db.transaction(store).objectStore(store).get(key);
+      r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
+    })
+  };
+})();
 
-// FORM
-function onSubmit(e){
-  e.preventDefault();
-  const btn=e.target.querySelector('button');
-  btn.textContent='Message sent ✓';
-  btn.style.background='var(--muted)';
-  setTimeout(()=>{btn.textContent='Send Message';btn.style.background='';e.target.reset();},3000);
+/* ============================================================
+   LUT PARSERS
+   Each returns { type:"1D"|"3D"|"hald", size, data:Float32Array }
+   3D data layout: RED fastest, then green, then blue (cube order),
+   i.e. index = (b*size*size + g*size + r) * 3
+   ============================================================ */
+
+function parseCube(text) {
+  let size = 0, is1D = false;
+  let dmin = [0, 0, 0], dmax = [1, 1, 1];
+  const vals = [];
+  for (let line of text.split(/\r?\n/)) {
+    line = line.trim();
+    if (!line || line.startsWith("#")) continue;
+    const up = line.toUpperCase();
+    if (up.startsWith("TITLE")) continue;
+    if (up.startsWith("LUT_3D_SIZE")) { size = parseInt(line.split(/\s+/)[1]); is1D = false; continue; }
+    if (up.startsWith("LUT_1D_SIZE")) { size = parseInt(line.split(/\s+/)[1]); is1D = true; continue; }
+    if (up.startsWith("DOMAIN_MIN")) { dmin = line.split(/\s+/).slice(1).map(Number); continue; }
+    if (up.startsWith("DOMAIN_MAX")) { dmax = line.split(/\s+/).slice(1).map(Number); continue; }
+    if (up.startsWith("LUT_3D_INPUT_RANGE") || up.startsWith("LUT_1D_INPUT_RANGE")) continue;
+    const parts = line.split(/\s+/).map(Number);
+    if (parts.length >= 3 && parts.every(n => isFinite(n))) vals.push(parts[0], parts[1], parts[2]);
+  }
+  if (!size) {
+    // Some .cube files omit the header — infer from a perfect cube count
+    const n = vals.length / 3;
+    const c = Math.round(Math.cbrt(n));
+    if (c * c * c === n && c >= 2) { size = c; is1D = false; }
+    else if (n >= 2) { size = n; is1D = true; }
+    else throw new Error("No LUT size declared and count is not a perfect cube");
+  }
+  const expected = is1D ? size * 3 : size * size * size * 3;
+  if (vals.length < expected) throw new Error(`Truncated data: got ${vals.length / 3} entries, expected ${expected / 3}`);
+  // Normalize domain if non-default
+  const data = new Float32Array(expected);
+  for (let i = 0; i < expected; i++) {
+    const ch = i % 3;
+    const range = (dmax[ch] - dmin[ch]) || 1;
+    data[i] = (vals[i] - dmin[ch]) / range;
+  }
+  return { type: is1D ? "1D" : "3D", size, data };
 }
 
-// ACTIVE NAV
-const secs=document.querySelectorAll('section[id]'),navAs=document.querySelectorAll('nav a');
-window.addEventListener('scroll',()=>{
-  const y=scrollY+120;
-  secs.forEach(s=>{
-    const top=s.offsetTop,bot=top+s.offsetHeight,href='#'+s.id;
-    navAs.forEach(a=>{if(a.getAttribute('href')===href)a.style.color=y>=top&&y<bot?'var(--text)':'';});
+function parse3dl(text) {
+  // .3dl: optional shaper ramp line, then size^3 integer triples, RED slowest (blue fastest)
+  const lines = text.split(/\r?\n/).map(l => l.trim()).filter(l => l && !l.startsWith("#") && !l.startsWith("//"));
+  let shaper = null;
+  const triples = [];
+  for (const line of lines) {
+    const parts = line.split(/\s+/).map(Number);
+    if (parts.some(n => !isFinite(n))) continue; // skip keyword lines (3DMESH, Mesh, etc.)
+    if (parts.length > 3 && !shaper && triples.length === 0) { shaper = parts; continue; }
+    if (parts.length === 3) triples.push(parts);
+  }
+  const n = triples.length;
+  const size = Math.round(Math.cbrt(n));
+  if (size * size * size !== n || size < 2) throw new Error("Entry count is not a perfect cube");
+  // Detect bit depth from max output value
+  let max = 0;
+  for (const t of triples) max = Math.max(max, t[0], t[1], t[2]);
+  const scale = max <= 1.01 ? 1 : max <= 255 ? 255 : max <= 1023 ? 1023 : max <= 4095 ? 4095 : 65535;
+  const data = new Float32Array(n * 3);
+  // Input order: r slowest, g, b fastest → remap to cube order (r fastest)
+  let i = 0;
+  for (let r = 0; r < size; r++) for (let g = 0; g < size; g++) for (let b = 0; b < size; b++) {
+    const t = triples[i++];
+    const o = (b * size * size + g * size + r) * 3;
+    data[o] = t[0] / scale; data[o + 1] = t[1] / scale; data[o + 2] = t[2] / scale;
+  }
+  return { type: "3D", size, data };
+}
+
+function parseCsp(text) {
+  const lines = text.split(/\r?\n/).map(l => l.trim());
+  if (!/^CSPLUTV100/i.test(lines[0] || "")) throw new Error("Missing CSPLUTV100 header");
+  const dim = (lines[1] || "").toUpperCase(); // "3D" or "1D"
+  let i = 2;
+  // Skip optional BEGIN METADATA … END METADATA
+  while (i < lines.length && !lines[i]) i++;
+  if (/^BEGIN METADATA/i.test(lines[i] || "")) {
+    while (i < lines.length && !/^END METADATA/i.test(lines[i])) i++;
+    i++;
+  }
+  // Three pre-LUT (shaper) sections: count line, input line, output line
+  let shaperWarn = false;
+  for (let ch = 0; ch < 3; ch++) {
+    while (i < lines.length && !lines[i]) i++;
+    const count = parseInt(lines[i]); i++;
+    if (count > 2) shaperWarn = true;
+    i += 2; // skip in + out rows
+  }
+  while (i < lines.length && !lines[i]) i++;
+  const sizes = lines[i].split(/\s+/).map(Number); i++;
+  const vals = [];
+  for (; i < lines.length; i++) {
+    if (!lines[i]) continue;
+    const p = lines[i].split(/\s+/).map(Number);
+    if (p.length >= 3 && p.every(isFinite)) vals.push(p[0], p[1], p[2]);
+  }
+  if (dim === "1D") {
+    const size = sizes[0];
+    if (vals.length < size * 3) throw new Error("Truncated 1D data");
+    return { type: "1D", size, data: new Float32Array(vals.slice(0, size * 3)), shaperWarn };
+  }
+  const [sr, sg, sb] = sizes;
+  if (sr !== sg || sg !== sb) throw new Error("Non-uniform 3D grid not supported");
+  const size = sr;
+  if (vals.length < size ** 3 * 3) throw new Error("Truncated 3D data");
+  // CSP data order is red fastest — same as cube
+  return { type: "3D", size, data: new Float32Array(vals.slice(0, size ** 3 * 3)), shaperWarn };
+}
+
+function parseNucodaVf(text) {
+  // ASCII key/value; data lines after "global_transform" — treat numeric triples as cube-order grid
+  const vals = [];
+  for (const line of text.split(/\r?\n/)) {
+    const p = line.trim().split(/\s+/).map(Number);
+    if (p.length === 3 && p.every(isFinite)) vals.push(...p);
+  }
+  const n = vals.length / 3, c = Math.round(Math.cbrt(n));
+  if (c * c * c !== n || c < 2) throw new Error("Could not locate a cubic grid in .vf file");
+  let max = Math.max(...vals);
+  const scale = max <= 1.01 ? 1 : max <= 1023 ? 1023 : max <= 4095 ? 4095 : 65535;
+  return { type: "3D", size: c, data: Float32Array.from(vals, v => v / scale) };
+}
+
+function parseGenericText(text) {
+  // .lut / .dat / .look — try cube first, then bare numeric grid
+  try { return parseCube(text); } catch (_) {}
+  const vals = [];
+  for (const line of text.split(/\r?\n/)) {
+    const t = line.trim();
+    if (!t || /[A-Za-z]{3,}/.test(t)) continue;
+    const p = t.split(/[\s,;]+/).map(Number);
+    if (p.length >= 3 && p.every(isFinite)) vals.push(p[0], p[1], p[2]);
+  }
+  const n = vals.length / 3, c = Math.round(Math.cbrt(n));
+  let max = 0; for (const v of vals) max = Math.max(max, v);
+  const scale = max <= 1.01 ? 1 : max <= 255 ? 255 : max <= 1023 ? 1023 : max <= 4095 ? 4095 : 65535;
+  if (c * c * c === n && c >= 2) return { type: "3D", size: c, data: Float32Array.from(vals, v => v / scale) };
+  if (n >= 2 && n <= 65536) return { type: "1D", size: n, data: Float32Array.from(vals, v => v / scale) };
+  throw new Error("Could not auto-detect LUT structure");
+}
+
+async function parseHald(file) {
+  const bmp = await createImageBitmap(file);
+  const { width, height } = bmp;
+  if (width !== height) { bmp.close(); throw new Error("Hald CLUT must be square"); }
+  // level L → image L³ × L³? Common identity Hald: width = level³ is wrong; standard: width = L*L*... 
+  // Standard Hald CLUT level L: dimensions (L³ × L³)? No — width = L³ when arranged as L²-size LUT.
+  // Practical rule: lutSize = cbrt(width*height) rounded; verify lutSize³ == width*height.
+  const total = width * height;
+  const lutSize = Math.round(Math.cbrt(total));
+  if (lutSize * lutSize * lutSize !== total) { bmp.close(); throw new Error(`Dimensions ${width}×${height} are not a valid Hald CLUT`); }
+  const c = document.createElement("canvas");
+  c.width = width; c.height = height;
+  const g = c.getContext("2d", { willReadFrequently: true });
+  g.drawImage(bmp, 0, 0); bmp.close();
+  const px = g.getImageData(0, 0, width, height).data;
+  const data = new Float32Array(lutSize ** 3 * 3);
+  // Hald ordering: red fastest, then green, then blue, scanline order — same as cube
+  for (let i = 0; i < lutSize ** 3; i++) {
+    data[i * 3] = px[i * 4] / 255;
+    data[i * 3 + 1] = px[i * 4 + 1] / 255;
+    data[i * 3 + 2] = px[i * 4 + 2] / 255;
+  }
+  return { type: "hald", size: lutSize, data };
+}
+
+async function detectAndParseLUT(file) {
+  const e = ext(file.name);
+  if (e === "png" || e === "tiff" || e === "tif") return parseHald(file);
+  if (e === "mga" || e === "m3d" || e === "icc" || e === "icm") {
+    throw new Error(`Binary ${e.toUpperCase()} parsing isn't supported in this build — convert to .cube in Resolve or Lattice`);
+  }
+  const text = await file.text();
+  // Content-inspection fallback chain
+  if (e === "cube") return parseCube(text);
+  if (e === "3dl") return parse3dl(text);
+  if (e === "csp" || /^CSPLUTV100/i.test(text)) return parseCsp(text);
+  if (e === "vf") return parseNucodaVf(text);
+  if (/LUT_3D_SIZE|LUT_1D_SIZE/i.test(text)) return parseCube(text);
+  return parseGenericText(text);
+}
+
+/* CPU trilinear sampler (for LUT card thumbnails + Canvas2D fallback) */
+function sampleLUT(lut, r, g, b) {
+  const s = lut.size, d = lut.data;
+  if (lut.type === "1D") {
+    const f = i => {
+      const x = clamp(i, 0, 1) * (s - 1);
+      const x0 = Math.floor(x), x1 = Math.min(x0 + 1, s - 1), t = x - x0;
+      return [0, 1, 2].map(c => d[x0 * 3 + c] * (1 - t) + d[x1 * 3 + c] * t);
+    };
+    return [f(r)[0], f(g)[1], f(b)[2]];
+  }
+  const idx = (ri, gi, bi) => (bi * s * s + gi * s + ri) * 3;
+  const fx = clamp(r, 0, 1) * (s - 1), fy = clamp(g, 0, 1) * (s - 1), fz = clamp(b, 0, 1) * (s - 1);
+  const x0 = Math.floor(fx), y0 = Math.floor(fy), z0 = Math.floor(fz);
+  const x1 = Math.min(x0 + 1, s - 1), y1 = Math.min(y0 + 1, s - 1), z1 = Math.min(z0 + 1, s - 1);
+  const tx = fx - x0, ty = fy - y0, tz = fz - z0;
+  const out = [0, 0, 0];
+  for (let c = 0; c < 3; c++) {
+    const c000 = d[idx(x0,y0,z0)+c], c100 = d[idx(x1,y0,z0)+c], c010 = d[idx(x0,y1,z0)+c], c110 = d[idx(x1,y1,z0)+c];
+    const c001 = d[idx(x0,y0,z1)+c], c101 = d[idx(x1,y0,z1)+c], c011 = d[idx(x0,y1,z1)+c], c111 = d[idx(x1,y1,z1)+c];
+    const c00 = c000*(1-tx)+c100*tx, c10 = c010*(1-tx)+c110*tx, c01 = c001*(1-tx)+c101*tx, c11 = c011*(1-tx)+c111*tx;
+    out[c] = (c00*(1-ty)+c10*ty)*(1-tz) + (c01*(1-ty)+c11*ty)*tz;
+  }
+  return out;
+}
+
+/* Generate a 48×32 thumbnail Blob by applying the LUT to a synthetic test gradient */
+let _testImageData = null;
+function getTestImage() {
+  if (_testImageData) return _testImageData;
+  const w = 96, h = 64;
+  const c = document.createElement("canvas"); c.width = w; c.height = h;
+  const g = c.getContext("2d");
+  // A photographic-feel gradient: warm sky → skin midtone → cool shadow
+  const grad = g.createLinearGradient(0, 0, w, h);
+  grad.addColorStop(0, "#E8B87A"); grad.addColorStop(0.35, "#C98A6B");
+  grad.addColorStop(0.6, "#6E7B8C"); grad.addColorStop(1, "#1C2230");
+  g.fillStyle = grad; g.fillRect(0, 0, w, h);
+  const grad2 = g.createRadialGradient(w*0.7, h*0.3, 4, w*0.7, h*0.3, w*0.55);
+  grad2.addColorStop(0, "rgba(255,250,235,0.9)"); grad2.addColorStop(1, "rgba(255,250,235,0)");
+  g.fillStyle = grad2; g.fillRect(0, 0, w, h);
+  _testImageData = g.getImageData(0, 0, w, h);
+  return _testImageData;
+}
+async function makeLutThumbnail(lut) {
+  const src = getTestImage();
+  const w = src.width, h = src.height;
+  const out = new ImageData(w, h);
+  for (let i = 0; i < w * h; i++) {
+    const [r, g, b] = sampleLUT(lut, src.data[i*4]/255, src.data[i*4+1]/255, src.data[i*4+2]/255);
+    out.data[i*4] = r * 255; out.data[i*4+1] = g * 255; out.data[i*4+2] = b * 255; out.data[i*4+3] = 255;
+  }
+  const c = document.createElement("canvas"); c.width = w; c.height = h;
+  c.getContext("2d").putImageData(out, 0, 0);
+  return new Promise(res => c.toBlob(res, "image/jpeg", 0.85));
+}
+
+/* ---------------- RAW preview extraction ----------------
+   Most RAW formats (ARW, CR2/CR3, NEF, RAF, DNG…) embed a full-size
+   JPEG preview. We scan the container for the largest JPEG stream —
+   a robust, dependency-free way to preview RAW in the browser. */
+function extractRawPreview(buf) {
+  const u8 = new Uint8Array(buf);
+  let best = null;
+  for (let i = 0; i < u8.length - 1; i++) {
+    if (u8[i] === 0xFF && u8[i+1] === 0xD8 && u8[i+2] === 0xFF) {
+      // find matching EOI
+      for (let j = i + 2; j < u8.length - 1; j++) {
+        if (u8[j] === 0xFF && u8[j+1] === 0xD9) {
+          const len = j + 2 - i;
+          if (!best || len > best.len) best = { start: i, len };
+          i = j + 1;
+          break;
+        }
+      }
+    }
+  }
+  if (!best || best.len < 60_000) return null; // ignore tiny thumbnails
+  return new Blob([u8.subarray(best.start, best.start + best.len)], { type: "image/jpeg" });
+}
+
+/* ============================================================
+   Adjustment GLSL — shared by the WebGL 2 and WebGL 1 shaders.
+   Functions only (uniforms are declared in each shader). The math
+   runs in display space on the post-LUT colour, in the order:
+   Exposure → Contrast → Highlights/Shadows/Whites/Blacks →
+   Temperature/Tint → Saturation/Vibrance  (sharpen/vignette/grain
+   are applied by the caller after neighbour sampling).
+   ============================================================ */
+const ADJ_GLSL = `
+  float adjLuma(vec3 c){ return dot(c, vec3(0.2126, 0.7152, 0.0722)); }
+  vec3 rgb2hsl(vec3 c){
+    float mx = max(max(c.r,c.g),c.b), mn = min(min(c.r,c.g),c.b);
+    float h = 0.0, s = 0.0, l = (mx+mn)*0.5, d = mx-mn;
+    if(d > 1e-5){
+      s = l > 0.5 ? d/(2.0-mx-mn) : d/(mx+mn);
+      if(mx == c.r)      h = (c.g-c.b)/d + (c.g < c.b ? 6.0 : 0.0);
+      else if(mx == c.g) h = (c.b-c.r)/d + 2.0;
+      else               h = (c.r-c.g)/d + 4.0;
+      h /= 6.0;
+    }
+    return vec3(h,s,l);
+  }
+  float hue2rgb(float p, float q, float t){
+    if(t < 0.0) t += 1.0;
+    if(t > 1.0) t -= 1.0;
+    if(t < 1.0/6.0) return p + (q-p)*6.0*t;
+    if(t < 0.5)     return q;
+    if(t < 2.0/3.0) return p + (q-p)*(2.0/3.0 - t)*6.0;
+    return p;
+  }
+  vec3 hsl2rgb(vec3 hsl){
+    float h = hsl.x, s = hsl.y, l = hsl.z;
+    if(s < 1e-5) return vec3(l);
+    float q = l < 0.5 ? l*(1.0+s) : l+s-l*s;
+    float p = 2.0*l - q;
+    return vec3(hue2rgb(p,q,h+1.0/3.0), hue2rgb(p,q,h), hue2rgb(p,q,h-1.0/3.0));
+  }
+  vec3 applyAdjust(vec3 c){
+    // Exposure — multiply linear light by pow(2, EV)
+    vec3 lin = pow(max(c, 0.0), vec3(2.2));
+    lin *= exp2(uExposure);
+    c = pow(max(lin, 0.0), vec3(1.0/2.2));
+    // Contrast — S-curve pivot at 0.5
+    c = (c - 0.5) * (1.0 + uContrast) + 0.5;
+    // Highlights / Shadows / Whites / Blacks — luma-weighted
+    float L = adjLuma(clamp(c, 0.0, 1.0));
+    c += uShadows    * 0.5 * (1.0 - smoothstep(0.0, 0.5, L));
+    c += uHighlights * 0.5 * smoothstep(0.5, 1.0, L);
+    c += uWhites     * 0.4 * smoothstep(0.6, 1.0, L);
+    c += uBlacks     * 0.4 * (1.0 - smoothstep(0.0, 0.4, L));
+    // Temperature (blue↔orange) / Tint (green↔magenta) on RGB
+    c.r += uTemp * 0.10;  c.b -= uTemp * 0.10;
+    c.g -= uTint * 0.10;  c.r += uTint * 0.05;  c.b += uTint * 0.05;
+    // Saturation then Vibrance (HSL S channel)
+    c = clamp(c, 0.0, 1.0);
+    vec3 hsl = rgb2hsl(c);
+    hsl.y = clamp(hsl.y * (1.0 + uSaturation), 0.0, 1.0);
+    hsl.y = clamp(hsl.y * (1.0 + uVibrance * (1.0 - hsl.y)), 0.0, 1.0);
+    return hsl2rgb(hsl);
+  }
+  // Vignette + grain — applied after sharpen, using screen coords.
+  vec3 applyFinish(vec3 c){
+    float d = distance(gl_FragCoord.xy / uResolution, vec2(0.5));
+    c *= 1.0 - uVignette * smoothstep(0.25, 0.85, d);
+    if(uGrain > 0.001){
+      float n = fract(sin(dot(gl_FragCoord.xy + vec2(uTime), vec2(12.9898, 78.233))) * 43758.5453);
+      c += (n - 0.5) * uGrain * 0.25;
+    }
+    return c;
+  }
+`;
+
+/* ============================================================
+   LUTEngine — WebGL 2 (sampler3D) with WebGL 1 atlas fallback
+   ============================================================ */
+class LUTEngine {
+  constructor(canvas) {
+    this.canvas = canvas;
+    this.gl = canvas.getContext("webgl2", { preserveDrawingBuffer: true, antialias: false });
+    this.isGL2 = !!this.gl;
+    if (!this.gl) {
+      this.gl = canvas.getContext("webgl", { preserveDrawingBuffer: true, antialias: false });
+    }
+    if (!this.gl) { this.unsupported = true; return; }
+    const gl = this.gl;
+    this.prog = this._buildProgram();
+    gl.useProgram(this.prog);
+
+    // Fullscreen quad
+    const buf = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, -1,1, 1,1]), gl.STATIC_DRAW);
+    const loc = gl.getAttribLocation(this.prog, "aPos");
+    gl.enableVertexAttribArray(loc);
+    gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+
+    this.u = {};
+    for (const n of ["uImage","uLUT","uLUT1D","uLUTSize","uStrength","uLutType","uMode","uSplit","uResolution","uFit","uZoom","uPan","uLinear","uFlipY",
+      "uExposure","uContrast","uHighlights","uShadows","uWhites","uBlacks","uTemp","uTint","uSaturation","uVibrance","uSharpen","uVignette","uGrain","uTexel","uTime"])
+      this.u[n] = gl.getUniformLocation(this.prog, n);
+
+    this.imageTex = gl.createTexture();
+    this.imgW = 0; this.imgH = 0;
+    this.lutTexCache = new Map(); // lutId -> {tex, size, type}
+    this.activeLutEntry = null;
+  }
+
+  _buildProgram() {
+    const gl = this.gl;
+    const vs2 = `#version 300 es
+      in vec2 aPos; out vec2 vUv;
+      void main(){ vUv = vec2(aPos.x*0.5+0.5, 0.5-aPos.y*0.5); gl_Position = vec4(aPos,0.,1.); }`;
+    const fs2 = `#version 300 es
+      precision highp float; precision highp sampler3D;
+      in vec2 vUv; out vec4 outColor;
+      uniform sampler2D uImage;
+      uniform sampler3D uLUT;
+      uniform sampler2D uLUT1D;
+      uniform float uLUTSize;
+      uniform float uStrength;
+      uniform int uLutType;   // 0=none 1=3D 2=1D
+      uniform int uMode;      // 0=graded 1=original 2=split
+      uniform float uSplit;
+      uniform vec2 uResolution;
+      uniform vec2 uFit;
+      uniform float uZoom;
+      uniform vec2 uPan;
+      uniform int uLinear;
+      uniform int uFlipY;
+      // ---- Adjustment uniforms (post-LUT finishing layer) ----
+      uniform float uExposure;    // EV
+      uniform float uContrast;    // -1..1
+      uniform float uHighlights;  // -1..1
+      uniform float uShadows;     // -1..1
+      uniform float uWhites;      // -1..1
+      uniform float uBlacks;      // -1..1
+      uniform float uTemp;        // -1..1
+      uniform float uTint;        // -1..1
+      uniform float uSaturation;  // -1..1
+      uniform float uVibrance;    // -1..1
+      uniform float uSharpen;     // 0..1
+      uniform float uVignette;    // -1..1
+      uniform float uGrain;       // 0..1
+      uniform vec2  uTexel;       // 1/imageSize
+      uniform float uTime;        // per-frame grain seed
+
+      vec3 applyLUT(vec3 c){
+        if(uLinear==1) c = pow(max(c,0.0), vec3(2.2));
+        vec3 g;
+        if(uLutType==1){
+          vec3 scaled = c*(uLUTSize-1.0)/uLUTSize + 0.5/uLUTSize;
+          g = texture(uLUT, scaled).rgb;
+        } else if(uLutType==2){
+          float sc=(uLUTSize-1.0)/uLUTSize, off=0.5/uLUTSize;
+          g = vec3(texture(uLUT1D, vec2(c.r*sc+off,0.5)).r,
+                   texture(uLUT1D, vec2(c.g*sc+off,0.5)).g,
+                   texture(uLUT1D, vec2(c.b*sc+off,0.5)).b);
+        } else g = c;
+        if(uLinear==1) g = pow(max(g,0.0), vec3(1.0/2.2));
+        return g;
+      }
+      ${ADJ_GLSL}
+      // Per-pixel grade: LUT + exposure→...→saturation/vibrance (pre-sharpen)
+      vec3 lookDev(vec3 ci){
+        vec3 c = ci + (applyLUT(ci)-ci)*uStrength;
+        return applyAdjust(c);
+      }
+      void main(){
+        vec2 uv = vUv;
+        if(uFlipY==1) uv.y = 1.0-uv.y;
+        uv = (uv-0.5)/uZoom*uFit + 0.5 + uPan;
+        if(uv.x<0.0||uv.x>1.0||uv.y<0.0||uv.y>1.0){ outColor = vec4(0.039,0.039,0.039,1.0); return; }
+        vec4 src = texture(uImage, uv);
+        vec3 orig = src.rgb;
+        vec3 graded = lookDev(orig);
+        // Sharpness — unsharp mask via neighbour pixel sampling
+        if(uSharpen > 0.001){
+          vec3 blur = lookDev(texture(uImage, uv+vec2(uTexel.x,0.0)).rgb)
+                    + lookDev(texture(uImage, uv-vec2(uTexel.x,0.0)).rgb)
+                    + lookDev(texture(uImage, uv+vec2(0.0,uTexel.y)).rgb)
+                    + lookDev(texture(uImage, uv-vec2(0.0,uTexel.y)).rgb);
+          blur *= 0.25;
+          graded += (graded - blur) * (uSharpen * 2.0);
+        }
+        graded = applyFinish(graded);
+        bool showOrig = (uMode==1) || (uMode==2 && gl_FragCoord.x/uResolution.x < uSplit);
+        outColor = vec4(showOrig ? orig : clamp(graded,0.0,1.0), src.a);
+      }`;
+    const vs1 = `attribute vec2 aPos; varying vec2 vUv;
+      void main(){ vUv = vec2(aPos.x*0.5+0.5, 0.5-aPos.y*0.5); gl_Position = vec4(aPos,0.,1.); }`;
+    const fs1 = `precision highp float;
+      varying vec2 vUv;
+      uniform sampler2D uImage;
+      uniform sampler2D uLUT;    // 2D atlas: width=size*size, height=size
+      uniform sampler2D uLUT1D;
+      uniform float uLUTSize;
+      uniform float uStrength;
+      uniform int uLutType;
+      uniform int uMode;
+      uniform float uSplit;
+      uniform vec2 uResolution;
+      uniform vec2 uFit;
+      uniform float uZoom;
+      uniform vec2 uPan;
+      uniform int uLinear;
+      uniform int uFlipY;
+      uniform float uExposure;
+      uniform float uContrast;
+      uniform float uHighlights;
+      uniform float uShadows;
+      uniform float uWhites;
+      uniform float uBlacks;
+      uniform float uTemp;
+      uniform float uTint;
+      uniform float uSaturation;
+      uniform float uVibrance;
+      uniform float uSharpen;
+      uniform float uVignette;
+      uniform float uGrain;
+      uniform vec2  uTexel;
+      uniform float uTime;
+
+      vec3 lut3dAtlas(vec3 c){
+        float s = uLUTSize;
+        float b = c.b*(s-1.0);
+        float b0 = floor(b); float b1 = min(b0+1.0, s-1.0); float t = b-b0;
+        float xs = (c.r*(s-1.0)+0.5)/(s*s);
+        float y  = (c.g*(s-1.0)+0.5)/s;
+        vec3 a = texture2D(uLUT, vec2(xs + b0/s, y)).rgb;
+        vec3 d = texture2D(uLUT, vec2(xs + b1/s, y)).rgb;
+        return mix(a,d,t);
+      }
+      vec3 applyLUT(vec3 c){
+        if(uLinear==1) c = pow(max(c,vec3(0.0)), vec3(2.2));
+        vec3 g;
+        if(uLutType==1) g = lut3dAtlas(c);
+        else if(uLutType==2){
+          float sc=(uLUTSize-1.0)/uLUTSize, off=0.5/uLUTSize;
+          g = vec3(texture2D(uLUT1D, vec2(c.r*sc+off,0.5)).r,
+                   texture2D(uLUT1D, vec2(c.g*sc+off,0.5)).g,
+                   texture2D(uLUT1D, vec2(c.b*sc+off,0.5)).b);
+        } else g = c;
+        if(uLinear==1) g = pow(max(g,vec3(0.0)), vec3(1.0/2.2));
+        return g;
+      }
+      ${ADJ_GLSL}
+      vec3 lookDev(vec3 ci){
+        vec3 c = ci + (applyLUT(ci)-ci)*uStrength;
+        return applyAdjust(c);
+      }
+      void main(){
+        vec2 uv = vUv;
+        if(uFlipY==1) uv.y = 1.0-uv.y;
+        uv = (uv-0.5)/uZoom*uFit + 0.5 + uPan;
+        if(uv.x<0.0||uv.x>1.0||uv.y<0.0||uv.y>1.0){ gl_FragColor = vec4(0.039,0.039,0.039,1.0); return; }
+        vec4 src = texture2D(uImage, uv);
+        vec3 orig = src.rgb;
+        vec3 graded = lookDev(orig);
+        if(uSharpen > 0.001){
+          vec3 blur = lookDev(texture2D(uImage, uv+vec2(uTexel.x,0.0)).rgb)
+                    + lookDev(texture2D(uImage, uv-vec2(uTexel.x,0.0)).rgb)
+                    + lookDev(texture2D(uImage, uv+vec2(0.0,uTexel.y)).rgb)
+                    + lookDev(texture2D(uImage, uv-vec2(0.0,uTexel.y)).rgb);
+          blur *= 0.25;
+          graded += (graded - blur) * (uSharpen * 2.0);
+        }
+        graded = applyFinish(graded);
+        bool showOrig = (uMode==1) || (uMode==2 && gl_FragCoord.x/uResolution.x < uSplit);
+        gl_FragColor = vec4(showOrig ? orig : clamp(graded,0.0,1.0), src.a);
+      }`;
+    const gl2 = this.isGL2;
+    const compile = (type, src) => {
+      const sh = gl.createShader(type);
+      gl.shaderSource(sh, src); gl.compileShader(sh);
+      if (!gl.getShaderParameter(sh, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(sh));
+      return sh;
+    };
+    const p = gl.createProgram();
+    gl.attachShader(p, compile(gl.VERTEX_SHADER, gl2 ? vs2 : vs1));
+    gl.attachShader(p, compile(gl.FRAGMENT_SHADER, gl2 ? fs2 : fs1));
+    gl.linkProgram(p);
+    if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p));
+    return p;
+  }
+
+  setImage(source, w, h, flipY = false) {
+    const gl = this.gl;
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, this.imageTex);
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, source);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    this.imgW = w; this.imgH = h;
+    this.flipY = flipY;
+  }
+  updateImage(source) { // fast path for video frames
+    const gl = this.gl;
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, this.imageTex);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, source);
+  }
+
+  _uploadLut(lut) {
+    const gl = this.gl, s = lut.size;
+    const entry = { type: lut.type === "1D" ? 2 : 1, size: s };
+    if (lut.type === "1D") {
+      const tex = gl.createTexture();
+      gl.activeTexture(gl.TEXTURE2);
+      gl.bindTexture(gl.TEXTURE_2D, tex);
+      const px = new Uint8Array(s * 4);
+      for (let i = 0; i < s; i++) {
+        px[i*4] = clamp(lut.data[i*3],0,1)*255; px[i*4+1] = clamp(lut.data[i*3+1],0,1)*255;
+        px[i*4+2] = clamp(lut.data[i*3+2],0,1)*255; px[i*4+3] = 255;
+      }
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, s, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, px);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      entry.tex = tex;
+      return entry;
+    }
+    if (this.isGL2) {
+      const tex = gl.createTexture();
+      gl.activeTexture(gl.TEXTURE1);
+      gl.bindTexture(gl.TEXTURE_3D, tex);
+      const px = new Uint8Array(s * s * s * 4);
+      for (let i = 0; i < s * s * s; i++) {
+        px[i*4] = clamp(lut.data[i*3],0,1)*255; px[i*4+1] = clamp(lut.data[i*3+1],0,1)*255;
+        px[i*4+2] = clamp(lut.data[i*3+2],0,1)*255; px[i*4+3] = 255;
+      }
+      gl.texImage3D(gl.TEXTURE_3D, 0, gl.RGBA, s, s, s, 0, gl.RGBA, gl.UNSIGNED_BYTE, px);
+      gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_WRAP_R, gl.CLAMP_TO_EDGE);
+      entry.tex = tex;
+    } else {
+      // 2D atlas: width = s*s (slices along x by blue), height = s
+      const tex = gl.createTexture();
+      gl.activeTexture(gl.TEXTURE1);
+      gl.bindTexture(gl.TEXTURE_2D, tex);
+      const px = new Uint8Array(s * s * s * 4);
+      for (let b = 0; b < s; b++) for (let g2 = 0; g2 < s; g2++) for (let r = 0; r < s; r++) {
+        const src = (b*s*s + g2*s + r) * 3;
+        const dst = (g2 * s * s + b * s + r) * 4; // row g2, column b*s+r
+        px[dst] = clamp(lut.data[src],0,1)*255; px[dst+1] = clamp(lut.data[src+1],0,1)*255;
+        px[dst+2] = clamp(lut.data[src+2],0,1)*255; px[dst+3] = 255;
+      }
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, s*s, s, 0, gl.RGBA, gl.UNSIGNED_BYTE, px);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      entry.tex = tex;
+    }
+    return entry;
+  }
+
+  getLutEntry(lutRecord) {
+    if (!lutRecord || !lutRecord.data) return null;
+    let e = this.lutTexCache.get(lutRecord.id);
+    if (!e) {
+      e = this._uploadLut(lutRecord);
+      this.lutTexCache.set(lutRecord.id, e);
+      if (this.lutTexCache.size > 12) { // evict oldest
+        const [k, v] = this.lutTexCache.entries().next().value;
+        this.gl.deleteTexture(v.tex);
+        this.lutTexCache.delete(k);
+      }
+    }
+    return e;
+  }
+  evictLut(id) {
+    const e = this.lutTexCache.get(id);
+    if (e) { this.gl.deleteTexture(e.tex); this.lutTexCache.delete(id); }
+  }
+
+  computeFit(vw, vh) {
+    if (!this.imgW || !this.imgH) return [1, 1];
+    const imgA = this.imgW / this.imgH, vA = vw / vh;
+    // scale uv so image letterboxes inside viewport
+    return imgA > vA ? [1, imgA / vA] : [vA / imgA, 1];
+  }
+
+  draw(opts) {
+    const gl = this.gl;
+    const { lutEntry, strength, mode, split, zoom, pan, linear, viewport } = opts;
+    const [vx, vy, vw, vh] = viewport;
+    gl.viewport(vx, vy, vw, vh);
+    gl.useProgram(this.prog);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, this.imageTex);
+    gl.uniform1i(this.u.uImage, 0);
+
+    let lutType = 0;
+    if (lutEntry) {
+      lutType = lutEntry.type;
+      if (lutEntry.type === 1) {
+        gl.activeTexture(gl.TEXTURE1);
+        gl.bindTexture(this.isGL2 ? gl.TEXTURE_3D : gl.TEXTURE_2D, lutEntry.tex);
+        gl.uniform1i(this.u.uLUT, 1);
+      } else {
+        gl.activeTexture(gl.TEXTURE2);
+        gl.bindTexture(gl.TEXTURE_2D, lutEntry.tex);
+        gl.uniform1i(this.u.uLUT1D, 2);
+      }
+      gl.uniform1f(this.u.uLUTSize, lutEntry.size);
+    }
+    gl.uniform1i(this.u.uLutType, lutType);
+    gl.uniform1f(this.u.uStrength, strength);
+    gl.uniform1i(this.u.uMode, mode);
+    gl.uniform1f(this.u.uSplit, split);
+    gl.uniform2f(this.u.uResolution, this.canvas.width, this.canvas.height);
+    gl.uniform2fv(this.u.uFit, this.computeFit(vw, vh));
+    gl.uniform1f(this.u.uZoom, zoom);
+    gl.uniform2fv(this.u.uPan, pan);
+    gl.uniform1i(this.u.uLinear, linear ? 1 : 0);
+    gl.uniform1i(this.u.uFlipY, this.flipY ? 1 : 0);
+
+    // ---- Adjustments (post-LUT finishing layer) ----
+    const a = opts.adj || {};
+    const n = v => (v || 0) / 100;          // -100..100 / 0..100 sliders → shader scale
+    gl.uniform1f(this.u.uExposure,   a.exposure || 0);   // already in EV
+    gl.uniform1f(this.u.uContrast,   n(a.contrast));
+    gl.uniform1f(this.u.uHighlights, n(a.highlights));
+    gl.uniform1f(this.u.uShadows,    n(a.shadows));
+    gl.uniform1f(this.u.uWhites,     n(a.whites));
+    gl.uniform1f(this.u.uBlacks,     n(a.blacks));
+    gl.uniform1f(this.u.uTemp,       n(a.temperature));
+    gl.uniform1f(this.u.uTint,       n(a.tint));
+    gl.uniform1f(this.u.uSaturation, n(a.saturation));
+    gl.uniform1f(this.u.uVibrance,   n(a.vibrance));
+    gl.uniform1f(this.u.uSharpen,    n(a.sharpness));
+    gl.uniform1f(this.u.uVignette,   n(a.vignette));
+    gl.uniform1f(this.u.uGrain,      n(a.grain));
+    gl.uniform2f(this.u.uTexel, this.imgW ? 1 / this.imgW : 0, this.imgH ? 1 / this.imgH : 0);
+    gl.uniform1f(this.u.uTime, opts.time || 0);
+
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+  }
+}
+
+/* ============================================================
+   Application State
+   ============================================================ */
+const State = {
+  luts: [],            // records from IDB (in display order)
+  activeLutId: null,
+  gridLutIds: [],      // up to 4 for 2x2 mode
+  media: [],           // { id, name, kind:'image'|'video'|'raw', file, bitmap?, url?, w, h, duration?, badge }
+  activeMediaId: null,
+  strength: 1.0,
+  mode: "split",       // split | original | graded | grid
+  split: 0.5,
+  zoom: 1,
+  pan: [0, 0],
+  linearLight: false,
+  searchTerm: "",
+  tagFilter: null,
+  undoStack: [],
+  videoLoop: false,
+  needsRender: true,
+  sheetTab: "lut",
+  adjustments: {
+    exposure: 0, contrast: 0, highlights: 0, shadows: 0, whites: 0, blacks: 0,
+    temperature: 0, tint: 0, saturation: 0, vibrance: 0, sharpness: 0, vignette: 0, grain: 0
+  }
+};
+const MODE_NUM = { graded: 0, original: 1, split: 2 };
+
+/* Adjustment slider definitions, grouped in apply order */
+const ADJUST_DEFS = [
+  { group: "Light" },
+  { key: "exposure",   label: "Exposure",   min: -3,   max: 3,   step: 0.01, fmt: v => (v > 0 ? "+" : "") + v.toFixed(2) + " EV" },
+  { key: "contrast",   label: "Contrast",   min: -100, max: 100, step: 1 },
+  { key: "highlights", label: "Highlights", min: -100, max: 100, step: 1 },
+  { key: "shadows",    label: "Shadows",    min: -100, max: 100, step: 1 },
+  { key: "whites",     label: "Whites",     min: -100, max: 100, step: 1 },
+  { key: "blacks",     label: "Blacks",     min: -100, max: 100, step: 1 },
+  { group: "Color" },
+  { key: "temperature",label: "Temperature",min: -100, max: 100, step: 1 },
+  { key: "tint",       label: "Tint",       min: -100, max: 100, step: 1 },
+  { key: "saturation", label: "Saturation", min: -100, max: 100, step: 1 },
+  { key: "vibrance",   label: "Vibrance",   min: -100, max: 100, step: 1 },
+  { group: "Detail & FX" },
+  { key: "sharpness",  label: "Sharpness",  min: 0,    max: 100, step: 1 },
+  { key: "vignette",   label: "Vignette",   min: -100, max: 100, step: 1 },
+  { key: "grain",      label: "Grain",      min: 0,    max: 100, step: 1 },
+];
+const ADJUST_DEFAULTS = Object.freeze({
+  exposure: 0, contrast: 0, highlights: 0, shadows: 0, whites: 0, blacks: 0,
+  temperature: 0, tint: 0, saturation: 0, vibrance: 0, sharpness: 0, vignette: 0, grain: 0
+});
+
+let engine = null;
+const stage = $("#stage");
+const glCanvas = $("#gl-canvas");
+const hiddenVideo = $("#hidden-video");
+let rafId = null;
+let gridLabels = [];
+
+function activeLut() { return State.luts.find(l => l.id === State.activeLutId) || null; }
+function activeMedia() { return State.media.find(m => m.id === State.activeMediaId) || null; }
+
+function pushUndo() {
+  State.undoStack.push({ lutId: State.activeLutId, strength: State.strength, adjustments: { ...State.adjustments } });
+  if (State.undoStack.length > 50) State.undoStack.shift();
+}
+
+/* ---------------- Render loop ---------------- */
+function resizeCanvas() {
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const r = stage.getBoundingClientRect();
+  const w = Math.max(1, Math.round(r.width * dpr)), h = Math.max(1, Math.round(r.height * dpr));
+  if (glCanvas.width !== w || glCanvas.height !== h) {
+    glCanvas.width = w; glCanvas.height = h;
+    State.needsRender = true;
+  }
+}
+
+function render() {
+  rafId = requestAnimationFrame(render);
+  const m = activeMedia();
+  const playingVideo = m && m.kind === "video" && !hiddenVideo.paused && !hiddenVideo.ended;
+  if (!State.needsRender && !playingVideo) return;
+  State.needsRender = false;
+  if (!engine || engine.unsupported || !m) return;
+
+  if (playingVideo || (m.kind === "video" && State._videoDirty)) {
+    if (hiddenVideo.readyState >= 2) engine.updateImage(hiddenVideo);
+    State._videoDirty = false;
+    if (playingVideo) updateScrubUI();
+  }
+
+  const W = glCanvas.width, H = glCanvas.height;
+  const lut = activeLut();
+  const entry = lut && lut.data ? engine.getLutEntry(lut) : null;
+  const adj = State.adjustments;
+  const now = performance.now();
+
+  if (State.mode === "grid") {
+    const ids = State.gridLutIds.length ? State.gridLutIds :
+      State.luts.filter(l => l.data).slice(0, 4).map(l => l.id);
+    const quads = [[0, H/2, W/2, H/2], [W/2, H/2, W/2, H/2], [0, 0, W/2, H/2], [W/2, 0, W/2, H/2]];
+    const gl = engine.gl;
+    gl.enable(gl.SCISSOR_TEST);
+    for (let i = 0; i < 4; i++) {
+      const rec = State.luts.find(l => l.id === ids[i]);
+      const e = rec && rec.data ? engine.getLutEntry(rec) : null;
+      gl.scissor(...quads[i]);
+      engine.draw({
+        lutEntry: e, strength: e ? State.strength : 0, mode: 0,
+        split: 0.5, zoom: State.zoom, pan: State.pan,
+        linear: State.linearLight, viewport: quads[i],
+        adj, time: now
+      });
+    }
+    gl.disable(gl.SCISSOR_TEST);
+    updateGridLabels(ids);
+  } else {
+    engine.draw({
+      lutEntry: entry,
+      strength: entry ? State.strength : 0,
+      mode: MODE_NUM[State.mode] ?? 0,
+      split: State.split,
+      zoom: State.zoom, pan: State.pan,
+      linear: State.linearLight,
+      viewport: [0, 0, W, H],
+      adj, time: now
+    });
+    clearGridLabels();
+  }
+  if (!playingVideo) scheduleHistogram();
+}
+const requestRender = () => { State.needsRender = true; };
+
+function updateGridLabels(ids) {
+  clearGridLabels();
+  const pos = [["8px","calc(50% + 8px)"],["calc(50% + 8px)","calc(50% + 8px)"],["8px","8px"],["calc(50% + 8px)","8px"]];
+  ids.slice(0, 4).forEach((id, i) => {
+    const rec = State.luts.find(l => l.id === id);
+    const el = document.createElement("span");
+    el.className = "grid-label";
+    el.style.left = pos[i][0]; el.style.bottom = pos[i][1];
+    el.textContent = rec ? rec.name : "—";
+    stage.appendChild(el);
+    gridLabels.push(el);
   });
-},{passive:true});
+}
+function clearGridLabels() { gridLabels.forEach(e => e.remove()); gridLabels = []; }
+
+/* ---------------- Histogram ---------------- */
+let histTimer = null;
+function scheduleHistogram() {
+  if ($("#histogram-wrap").classList.contains("hidden")) return;
+  clearTimeout(histTimer);
+  histTimer = setTimeout(drawHistogram, 120);
+}
+function drawHistogram() {
+  const hc = $("#histogram-canvas"), g = hc.getContext("2d");
+  g.fillStyle = "#0D0D0D"; g.fillRect(0, 0, 256, 96);
+  if (!activeMedia()) return;
+  const tmp = document.createElement("canvas");
+  tmp.width = 128; tmp.height = 80;
+  tmp.getContext("2d").drawImage(glCanvas, 0, 0, 128, 80);
+  const px = tmp.getContext("2d").getImageData(0, 0, 128, 80).data;
+  const bins = [new Float32Array(256), new Float32Array(256), new Float32Array(256)];
+  for (let i = 0; i < px.length; i += 4) { bins[0][px[i]]++; bins[1][px[i+1]]++; bins[2][px[i+2]]++; }
+  const max = Math.max(...bins.map(b => Math.max(...b))) || 1;
+  g.globalCompositeOperation = "lighter";
+  const colors = ["#E05C5C", "#4CAF7D", "#6E9FE0"];
+  bins.forEach((b, c) => {
+    g.fillStyle = colors[c]; g.globalAlpha = 0.55;
+    for (let x = 0; x < 256; x++) {
+      const h = Math.pow(b[x] / max, 0.5) * 92;
+      g.fillRect(x, 96 - h, 1, h);
+    }
+  });
+  g.globalCompositeOperation = "source-over"; g.globalAlpha = 1;
+}
+
+/* ============================================================
+   LUT Library — load, render, interactions
+   ============================================================ */
+async function loadLibrary() {
+  State.luts = (await DB.getAll("luts")).sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+  renderLutList();
+}
+
+function lutBadge(l) {
+  if (l.parseError) return `<span class="badge badge-err">ERROR</span>`;
+  if (l.type === "hald") return `<span class="badge badge-hald">HALD</span>`;
+  if (l.type === "1D") return `<span class="badge badge-1d">1D</span>`;
+  return `<span class="badge badge-3d">3D</span>`;
+}
+
+function renderLutList() {
+  const list = $("#lut-list");
+  const term = State.searchTerm.toLowerCase();
+  const visible = State.luts.filter(l => {
+    if (term && !l.name.toLowerCase().includes(term)) return false;
+    if (State.tagFilter === "__fav") return l.favorite;
+    if (State.tagFilter) return (l.tags || []).includes(State.tagFilter);
+    return true;
+  });
+  list.innerHTML = "";
+  if (!visible.length) {
+    list.innerHTML = `<div class="lut-empty">${State.luts.length ?
+      "No LUTs match this filter." :
+      "Your library is empty.<br><br>Add .cube, .3dl, .csp or Hald CLUT files — they're stored locally and persist across sessions."}</div>`;
+    return;
+  }
+  for (const l of visible) {
+    const card = document.createElement("div");
+    card.className = "lut-card" + (l.id === State.activeLutId ? " selected" : "") + (l.parseError ? " error-card" : "");
+    card.draggable = true;
+    card.dataset.id = l.id;
+    card.setAttribute("role", "button");
+    card.tabIndex = 0;
+    const thumbUrl = l.thumbnail ? URL.createObjectURL(l.thumbnail) : "";
+    const meta = l.parseError
+      ? `<span style="color:var(--color-error)">${escapeHtml(l.parseError.slice(0, 60))}</span>`
+      : `${l.type === "1D" ? l.size + " pts" : l.size + "³"}`;
+    card.innerHTML = `
+      ${thumbUrl ? `<img class="lut-thumb" src="${thumbUrl}" alt="">` : `<div class="lut-thumb" style="display:grid;place-items:center;color:var(--color-error);font-size:14px;">!</div>`}
+      <div class="lut-info">
+        <div class="lut-name" title="Double-click to rename">${escapeHtml(l.name)}</div>
+        <div class="lut-meta">${lutBadge(l)}${meta}</div>
+      </div>
+      <div class="lut-actions">
+        <button class="btn-icon act-fav ${l.favorite ? "fav-on" : ""}" title="Favorite (F)">${l.favorite ? "★" : "☆"}</button>
+        <button class="btn-icon act-ren" title="Rename">✎</button>
+        <button class="btn-icon act-del" title="Delete">✕</button>
+      </div>`;
+    // Select
+    card.addEventListener("click", e => {
+      if (e.target.closest(".lut-actions") || card.querySelector("input")) return;
+      if (l.parseError) {
+        Toast.show("Can't apply this LUT", l.parseError + (l.rawHeader ? ` — header: "${l.rawHeader}"` : ""), "warning", 5000);
+        return;
+      }
+      selectLut(l.id);
+    });
+    card.addEventListener("keydown", e => { if (e.key === "Enter") card.click(); });
+    // Rename (dblclick or pencil)
+    const startRename = () => {
+      const nameEl = card.querySelector(".lut-name");
+      nameEl.innerHTML = `<input value="${escapeHtml(l.name)}">`;
+      const inp = nameEl.querySelector("input");
+      inp.focus(); inp.select();
+      const commit = async () => {
+        l.name = inp.value.trim() || l.name;
+        await DB.put("luts", l);
+        renderLutList(); updateInfoOverlay();
+      };
+      inp.addEventListener("blur", commit);
+      inp.addEventListener("keydown", ev => { if (ev.key === "Enter") inp.blur(); if (ev.key === "Escape") renderLutList(); });
+    };
+    card.querySelector(".lut-name").addEventListener("dblclick", startRename);
+    card.querySelector(".act-ren").addEventListener("click", e => { e.stopPropagation(); startRename(); });
+    card.querySelector(".act-fav").addEventListener("click", async e => {
+      e.stopPropagation();
+      l.favorite = !l.favorite;
+      await DB.put("luts", l);
+      renderLutList();
+    });
+    card.querySelector(".act-del").addEventListener("click", async e => {
+      e.stopPropagation();
+      await DB.del("luts", l.id);
+      if (engine) engine.evictLut(l.id);
+      State.luts = State.luts.filter(x => x.id !== l.id);
+      if (State.activeLutId === l.id) { State.activeLutId = null; updateInfoOverlay(); requestRender(); }
+      renderLutList();
+      Toast.show("LUT deleted", l.name, "info", 2500);
+    });
+    // Drag: reorder within list, OR drop onto canvas to apply
+    card.addEventListener("dragstart", e => {
+      card.classList.add("dragging");
+      e.dataTransfer.setData("text/lut-id", l.id);
+      e.dataTransfer.effectAllowed = "move";
+    });
+    card.addEventListener("dragend", () => card.classList.remove("dragging"));
+    card.addEventListener("dragover", e => { e.preventDefault(); });
+    card.addEventListener("drop", async e => {
+      const dragId = e.dataTransfer.getData("text/lut-id");
+      if (!dragId || dragId === l.id) return;
+      e.preventDefault(); e.stopPropagation();
+      const from = State.luts.findIndex(x => x.id === dragId);
+      const to = State.luts.findIndex(x => x.id === l.id);
+      const [moved] = State.luts.splice(from, 1);
+      State.luts.splice(to, 0, moved);
+      State.luts.forEach((x, i) => { x.order = i; });
+      await Promise.all(State.luts.map(x => DB.put("luts", x)));
+      renderLutList();
+    });
+    list.appendChild(card);
+  }
+}
+
+function selectLut(id, recordUndo = true) {
+  if (recordUndo) pushUndo();
+  State.activeLutId = id;
+  const l = activeLut();
+  if (l) { l.lastUsed = Date.now(); DB.put("luts", l); }
+  $("#active-lut-name").textContent = l ? l.name : "None";
+  // maintain grid selection: most recently used 4
+  if (l) {
+    State.gridLutIds = [id, ...State.gridLutIds.filter(x => x !== id)].slice(0, 4);
+  }
+  renderLutList();
+  updateInfoOverlay();
+  requestRender();
+}
+
+async function addLutFiles(files) {
+  let added = 0;
+  for (const file of files) {
+    const rec = {
+      id: uuid(),
+      name: file.name.replace(/\.[^.]+$/, ""),
+      type: "3D", size: 0,
+      data: null, raw: await file.arrayBuffer(),
+      ext: ext(file.name),
+      thumbnail: null, favorite: false,
+      tags: ["custom"], createdAt: Date.now(), lastUsed: 0,
+      order: State.luts.length
+    };
+    try {
+      const parsed = await detectAndParseLUT(file);
+      rec.type = parsed.type === "hald" ? "hald" : parsed.type;
+      rec.size = parsed.size;
+      rec.data = parsed.data;
+      rec.thumbnail = await makeLutThumbnail(parsed);
+      if (parsed.shaperWarn) Toast.show("Shaper ignored", `${file.name}: pre-LUT shaper curves aren't applied in this preview`, "warning");
+      // auto-tag from filename
+      const n = rec.name.toLowerCase();
+      if (/film|kodak|fuji|portra|ektar|cine/.test(n)) rec.tags.push(n.includes("cine") ? "cinematic" : "film");
+      if (/warm|gold|sun/.test(n)) rec.tags.push("warm");
+      if (/cool|teal|blue|arctic/.test(n)) rec.tags.push("cool");
+      added++;
+    } catch (err) {
+      rec.parseError = err.message;
+      const head = new Uint8Array(rec.raw.slice(0, 48));
+      rec.rawHeader = [...head].map(b => (b >= 32 && b < 127) ? String.fromCharCode(b) : "·").join("").trim();
+      Toast.show("Couldn't parse " + file.name, err.message, "error", 5000);
+    }
+    // Serialize Float32Array as ArrayBuffer for IDB friendliness
+    const stored = { ...rec, data: rec.data ? rec.data.buffer : null };
+    try { await DB.put("luts", stored); }
+    catch (e) {
+      if (e && /quota/i.test(e.name + e.message)) {
+        const est = navigator.storage?.estimate ? await navigator.storage.estimate() : null;
+        Toast.show("Storage full", est ? `Using ${fmtBytes(est.usage)} of ${fmtBytes(est.quota)}. Delete some LUTs to free space.` : "Delete some LUTs to free space.", "error", 6000);
+        continue;
+      }
+      throw e;
+    }
+    State.luts.push(rec);
+  }
+  renderLutList();
+  if (added) {
+    Toast.show(`${added} LUT${added > 1 ? "s" : ""} added`, "Stored locally — they'll be here next time.", "success");
+    if (!State.activeLutId) {
+      const first = State.luts.find(l => l.data);
+      if (first) selectLut(first.id, false);
+    }
+  }
+}
+
+// Rehydrate Float32Array after loading from IDB
+function rehydrateLuts() {
+  for (const l of State.luts) if (l.data && !(l.data instanceof Float32Array)) l.data = new Float32Array(l.data);
+}
+
+/* ============================================================
+   Media — load, filmstrip, RAW, video
+   ============================================================ */
+async function addMediaFiles(files) {
+  for (const file of files) {
+    const e = ext(file.name);
+    const isVideo = file.type.startsWith("video/") || VIDEO_EXTS.has(e);
+    const isRaw = RAW_EXTS.has(e) && !file.type.startsWith("image/");
+    const isHeic = e === "heic" || e === "heif";
+    const item = {
+      id: uuid(), name: file.name, file,
+      kind: isVideo ? "video" : "image",
+      badge: isVideo ? e.toUpperCase() : isRaw ? "RAW " + e.toUpperCase() : e.toUpperCase(),
+      size: file.size, w: 0, h: 0
+    };
+    try {
+      if (isVideo) {
+        item.url = URL.createObjectURL(file);
+        if (file.size > 2 * 1024 ** 3) Toast.show("Large video", "Files over 2 GB may stutter — playback streams from disk.", "warning", 5000);
+      } else if (isRaw) {
+        const buf = await file.arrayBuffer();
+        const preview = extractRawPreview(buf);
+        if (!preview) throw new Error("No embedded preview found — convert to DNG/JPEG (e.g. in Adobe DNG Converter) and re-add");
+        item.bitmap = await createImageBitmap(preview);
+        item.w = item.bitmap.width; item.h = item.bitmap.height;
+        item.rawNote = "Embedded camera preview (full RAW decode not available client-side)";
+      } else if (isHeic) {
+        try {
+          item.bitmap = await createImageBitmap(file); // Safari handles natively
+        } catch (_) {
+          if (window.heic2any) {
+            const blob = await heic2any({ blob: file, toType: "image/jpeg", quality: 0.95 });
+            item.bitmap = await createImageBitmap(blob);
+          } else {
+            throw new Error("HEIC isn't supported in this browser — convert to JPEG first");
+          }
+        }
+        item.w = item.bitmap.width; item.h = item.bitmap.height;
+      } else {
+        item.bitmap = await createImageBitmap(file);
+        item.w = item.bitmap.width; item.h = item.bitmap.height;
+      }
+      State.media.push(item);
+      addFilmThumb(item);
+      if (!State.activeMediaId) selectMedia(item.id);
+    } catch (err) {
+      Toast.show("Couldn't open " + file.name, err.message, "error", 6000);
+    }
+  }
+  $("#empty-state").style.display = State.media.length ? "none" : "flex";
+}
+
+function addFilmThumb(item) {
+  const strip = $("#filmstrip");
+  const btn = document.createElement("button");
+  btn.className = "film-thumb";
+  btn.dataset.id = item.id;
+  btn.title = item.name;
+  const badgeCls = item.kind === "video" ? "vid" : item.badge.startsWith("RAW") ? "raw" : "";
+  btn.innerHTML = `<canvas width="112" height="68"></canvas><span class="film-badge ${badgeCls}">${escapeHtml(item.badge)}</span>`;
+  const tc = btn.querySelector("canvas").getContext("2d");
+  tc.fillStyle = "#1F1F1F"; tc.fillRect(0, 0, 112, 68);
+  if (item.bitmap) drawCover(tc, item.bitmap, 112, 68);
+  else if (item.kind === "video") {
+    const v = document.createElement("video");
+    v.muted = true; v.playsInline = true; v.preload = "metadata";
+    v.src = item.url;
+    v.addEventListener("loadeddata", () => {
+      v.currentTime = Math.min(1, (v.duration || 2) / 2);
+    }, { once: true });
+    v.addEventListener("seeked", () => {
+      item.w = v.videoWidth; item.h = v.videoHeight; item.duration = v.duration;
+      drawCover(tc, v, 112, 68);
+      v.src = "";
+    }, { once: true });
+    v.addEventListener("error", () => {
+      tc.fillStyle = "#4A4A4A"; tc.font = "10px JetBrains Mono"; tc.textAlign = "center";
+      tc.fillText("no preview", 56, 38);
+    }, { once: true });
+  }
+  btn.addEventListener("click", () => selectMedia(item.id));
+  btn.addEventListener("contextmenu", e => { e.preventDefault(); openCtxMenu(e.clientX, e.clientY, item); });
+  let lpTimer;
+  btn.addEventListener("touchstart", e => {
+    lpTimer = setTimeout(() => {
+      const t = e.touches[0];
+      openCtxMenu(t.clientX, t.clientY, item);
+    }, 550);
+  }, { passive: true });
+  btn.addEventListener("touchend", () => clearTimeout(lpTimer));
+  btn.addEventListener("touchmove", () => clearTimeout(lpTimer));
+  strip.appendChild(btn);
+}
+function drawCover(ctx, src, w, h) {
+  const sw = src.videoWidth || src.width, sh = src.videoHeight || src.height;
+  const sA = sw / sh, dA = w / h;
+  let cw = sw, ch = sh, cx = 0, cy = 0;
+  if (sA > dA) { cw = sh * dA; cx = (sw - cw) / 2; } else { ch = sw / dA; cy = (sh - ch) / 2; }
+  ctx.drawImage(src, cx, cy, cw, ch, 0, 0, w, h);
+}
+
+function selectMedia(id) {
+  const item = State.media.find(m => m.id === id);
+  if (!item || !engine) return;
+  // teardown previous video
+  hiddenVideo.pause();
+  State.activeMediaId = id;
+  State.zoom = 1; State.pan = [0, 0];
+  $$(".film-thumb").forEach(t => t.classList.toggle("active", t.dataset.id === id));
+  $("#video-controls").classList.toggle("visible", item.kind === "video");
+  if (item.kind === "image") {
+    engine.setImage(item.bitmap, item.w, item.h, false);
+    requestRender();
+  } else {
+    hiddenVideo.src = item.url;
+    hiddenVideo.loop = State.videoLoop;
+    hiddenVideo.addEventListener("loadeddata", function onld() {
+      hiddenVideo.removeEventListener("loadeddata", onld);
+      item.w = hiddenVideo.videoWidth; item.h = hiddenVideo.videoHeight;
+      item.duration = hiddenVideo.duration;
+      if (!item.w) {
+        Toast.show("Codec not supported", `${item.name} — your browser can't decode this codec (often HEVC/ProRes in .mov). Re-encode to H.264/MP4, e.g. with HandBrake (handbrake.fr).`, "warning", 7000);
+        return;
+      }
+      engine.setImage(hiddenVideo, item.w, item.h, false);
+      State._videoDirty = true;
+      updateScrubUI();
+      requestRender();
+      updateInfoOverlay();
+    });
+    hiddenVideo.addEventListener("error", () => {
+      Toast.show("Playback failed", `${item.name} — codec not supported by this browser. Try converting with HandBrake.`, "error", 7000);
+    }, { once: true });
+    hiddenVideo.load();
+  }
+  updateInfoOverlay();
+}
+
+function removeMedia(id) {
+  const i = State.media.findIndex(m => m.id === id);
+  if (i < 0) return;
+  const item = State.media[i];
+  if (item.url) URL.revokeObjectURL(item.url);
+  if (item.bitmap) item.bitmap.close?.();
+  State.media.splice(i, 1);
+  $(`.film-thumb[data-id="${id}"]`)?.remove();
+  if (State.activeMediaId === id) {
+    State.activeMediaId = null;
+    hiddenVideo.pause(); hiddenVideo.src = "";
+    if (State.media.length) selectMedia(State.media[Math.max(0, i - 1)].id);
+    else { $("#empty-state").style.display = "flex"; requestRender(); }
+  }
+}
+
+/* Context menu */
+function openCtxMenu(x, y, item) {
+  const menu = $("#ctx-menu");
+  menu.innerHTML = `
+    <button data-act="meta">View metadata</button>
+    <button data-act="dup">Duplicate</button>
+    <button data-act="rm" class="danger">Remove</button>`;
+  menu.style.display = "block";
+  menu.style.left = Math.min(x, innerWidth - 180) + "px";
+  menu.style.top = Math.min(y, innerHeight - 130) + "px";
+  menu.onclick = e => {
+    const act = e.target.dataset.act;
+    if (act === "rm") removeMedia(item.id);
+    if (act === "dup") {
+      const copy = { ...item, id: uuid(), name: item.name.replace(/(\.[^.]+)?$/, " copy$1") };
+      if (item.url) copy.url = URL.createObjectURL(item.file);
+      State.media.push(copy); addFilmThumb(copy);
+    }
+    if (act === "meta") {
+      Toast.show(item.name,
+        `${item.w || "?"}×${item.h || "?"}${item.duration ? " · " + fmtTime(item.duration) : ""} · ${fmtBytes(item.size)} · ${item.badge}${item.rawNote ? " · " + item.rawNote : ""} · assumed sRGB`,
+        "info", 6000);
+    }
+    menu.style.display = "none";
+  };
+}
+document.addEventListener("click", e => { if (!e.target.closest("#ctx-menu")) $("#ctx-menu").style.display = "none"; });
+window.addEventListener("scroll", () => $("#ctx-menu").style.display = "none", true);
+
+/* ---------------- Video controls ---------------- */
+const btnPlay = $("#btn-play"), scrub = $("#scrub"), videoTime = $("#video-time");
+function updateScrubUI() {
+  if (!hiddenVideo.duration) return;
+  scrub.value = (hiddenVideo.currentTime / hiddenVideo.duration) * 1000;
+  setSliderPct(scrub);
+  videoTime.textContent = `${fmtTime(hiddenVideo.currentTime)} / ${fmtTime(hiddenVideo.duration)}`;
+  btnPlay.textContent = hiddenVideo.paused ? "▶" : "⏸";
+}
+function togglePlay() {
+  const m = activeMedia();
+  if (!m || m.kind !== "video") return;
+  if (hiddenVideo.paused) hiddenVideo.play().catch(() => {});
+  else hiddenVideo.pause();
+  setTimeout(updateScrubUI, 30);
+  requestRender();
+}
+btnPlay.addEventListener("click", togglePlay);
+scrub.addEventListener("input", () => {
+  if (!hiddenVideo.duration) return;
+  hiddenVideo.currentTime = (scrub.value / 1000) * hiddenVideo.duration;
+  setSliderPct(scrub);
+});
+hiddenVideo.addEventListener("seeked", () => { State._videoDirty = true; requestRender(); updateScrubUI(); });
+hiddenVideo.addEventListener("ended", updateScrubUI);
+const frameStep = dir => {
+  if (!hiddenVideo.duration) return;
+  hiddenVideo.pause();
+  hiddenVideo.currentTime = clamp(hiddenVideo.currentTime + dir / 30, 0, hiddenVideo.duration);
+};
+$("#btn-frame-back").addEventListener("click", () => frameStep(-1));
+$("#btn-frame-fwd").addEventListener("click", () => frameStep(1));
+$("#btn-loop").addEventListener("click", function () {
+  State.videoLoop = !State.videoLoop;
+  hiddenVideo.loop = State.videoLoop;
+  this.classList.toggle("on", State.videoLoop);
+});
+$("#btn-capture").addEventListener("click", () => exportImage("png", 1, "frame"));
+
+/* ---------------- Info overlay ---------------- */
+let infoFadeTimer = null;
+function updateInfoOverlay() {
+  const info = $("#canvas-info");
+  const l = activeLut(), m = activeMedia();
+  if (!m) { info.textContent = ""; return; }
+  info.innerHTML =
+    `<b>${escapeHtml(l ? l.name : "No LUT")}</b> · ` +
+    `${Math.round(State.strength * 100)}% · sRGB${State.linearLight ? " (linear apply)" : ""}` +
+    `<br><span style="color:var(--color-text-muted)">${escapeHtml(m.name)} — ${m.w}×${m.h}</span>`;
+  info.classList.remove("faded");
+  clearTimeout(infoFadeTimer);
+  infoFadeTimer = setTimeout(() => info.classList.add("faded"), 2000);
+}
+
+/* ============================================================
+   Stage interactions — split, zoom/pan, view modes
+   ============================================================ */
+const splitHandle = $("#split-handle");
+function layoutSplitHandle() {
+  const show = State.mode === "split" && activeMedia() && !isSmallMobile();
+  splitHandle.style.display = show ? "block" : "none";
+  $("#label-before").style.display = State.mode === "split" && activeMedia() ? "" : "none";
+  $("#label-after").style.display = State.mode === "split" && activeMedia() ? "" : "none";
+  if (show) splitHandle.style.left = (State.split * 100) + "%";
+}
+const isSmallMobile = () => matchMedia("(max-width: 767px)").matches;
+
+let splitDragging = false;
+function startSplitDrag(e) {
+  splitDragging = true;
+  splitHandle.classList.add("dragging");
+  e.preventDefault();
+}
+splitHandle.addEventListener("pointerdown", e => { startSplitDrag(e); splitHandle.setPointerCapture(e.pointerId); });
+splitHandle.addEventListener("pointermove", e => {
+  if (!splitDragging) return;
+  const r = stage.getBoundingClientRect();
+  State.split = clamp((e.clientX - r.left) / r.width, 0.02, 0.98);
+  splitHandle.style.left = (State.split * 100) + "%";
+  wakeSplitLabels();
+  requestRender();
+});
+splitHandle.addEventListener("pointerup", () => { splitDragging = false; splitHandle.classList.remove("dragging"); });
+
+let labelTimer = null;
+function wakeSplitLabels() {
+  $$(".split-label").forEach(l => l.classList.remove("faded"));
+  clearTimeout(labelTimer);
+  labelTimer = setTimeout(() => $$(".split-label").forEach(l => l.classList.add("faded")), 2200);
+}
+
+/* Zoom / pan / pinch / tap-to-toggle */
+let panActive = false, panStart = null, pinchStart = null;
+stage.addEventListener("wheel", e => {
+  if (!activeMedia()) return;
+  e.preventDefault();
+  const f = Math.exp(-e.deltaY * 0.0015);
+  State.zoom = clamp(State.zoom * f, 1, 16);
+  if (State.zoom === 1) State.pan = [0, 0];
+  requestRender(); updateInfoOverlay();
+}, { passive: false });
+
+stage.addEventListener("pointerdown", e => {
+  if (e.target.closest("#split-handle, #video-controls, #histogram-wrap, #empty-state")) return;
+  panActive = true;
+  panStart = { x: e.clientX, y: e.clientY, pan: [...State.pan] };
+  stage.setPointerCapture(e.pointerId);
+});
+stage.addEventListener("pointermove", e => {
+  if (!panActive || !panStart || State.zoom <= 1) return;
+  const r = stage.getBoundingClientRect();
+  State.pan = [
+    panStart.pan[0] - (e.clientX - panStart.x) / r.width / State.zoom,
+    panStart.pan[1] - (e.clientY - panStart.y) / r.height / State.zoom
+  ];
+  requestRender();
+});
+stage.addEventListener("pointerup", e => {
+  const moved = panStart && (Math.abs(e.clientX - panStart.x) + Math.abs(e.clientY - panStart.y) > 6);
+  // Mobile: tap toggles before/after
+  if (!moved && isSmallMobile() && activeMedia() && !e.target.closest("#video-controls, #empty-state")) {
+    State.mode = State.mode === "original" ? "graded" : "original";
+    syncModeButtons(); requestRender();
+    Toast.show(State.mode === "original" ? "Original" : "Graded", "Tap to toggle", "info", 1200);
+  }
+  panActive = false; panStart = null;
+});
+stage.addEventListener("dblclick", () => {
+  State.zoom = 1; State.pan = [0, 0];
+  requestRender();
+});
+// Pinch zoom
+stage.addEventListener("touchmove", e => {
+  if (e.touches.length === 2) {
+    e.preventDefault();
+    const d = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+    if (pinchStart == null) pinchStart = { d, zoom: State.zoom };
+    else { State.zoom = clamp(pinchStart.zoom * d / pinchStart.d, 1, 16); requestRender(); }
+  }
+}, { passive: false });
+stage.addEventListener("touchend", () => { pinchStart = null; });
+
+/* View mode buttons */
+function syncModeButtons() {
+  $$(".view-modes button").forEach(b => b.classList.toggle("active", b.dataset.mode === State.mode));
+  layoutSplitHandle();
+}
+$$(".view-modes button").forEach(b => b.addEventListener("click", () => {
+  State.mode = b.dataset.mode;
+  if (State.mode === "grid" && State.luts.filter(l => l.data).length < 2)
+    Toast.show("Grid mode", "Add at least 2 LUTs to compare side-by-side. The 4 most recently used LUTs fill the grid.", "info");
+  syncModeButtons();
+  requestRender();
+}));
+
+/* Strength sliders (desktop + mobile mirrored) */
+function setSliderPct(el) {
+  const pct = ((el.value - el.min) / (el.max - el.min)) * 100;
+  el.style.setProperty("--pct", pct + "%");
+}
+function setStrength(v, fromUndo = false) {
+  if (!fromUndo && Math.abs(v - State.strength) > 0.12) pushUndo();
+  State.strength = clamp(v, 0, 2);
+  for (const [slider, label] of [[$("#strength"), $("#strength-value")], [$("#m-strength"), $("#m-strength-value")]]) {
+    slider.value = Math.round(State.strength * 100);
+    label.textContent = Math.round(State.strength * 100) + "%";
+    setSliderPct(slider);
+  }
+  updateInfoOverlay();
+  requestRender();
+}
+$("#strength").addEventListener("input", e => setStrength(e.target.value / 100, true));
+$("#m-strength").addEventListener("input", e => setStrength(e.target.value / 100, true));
+$("#strength").addEventListener("change", pushUndo);
+$("#m-strength").addEventListener("change", pushUndo);
+
+/* ============================================================
+   Adjustments panel
+   ============================================================ */
+let adjDragSnapshot = null;
+function snapshotState() {
+  return { lutId: State.activeLutId, strength: State.strength, adjustments: { ...State.adjustments } };
+}
+function commitAdjDrag() {
+  if (!adjDragSnapshot) return;
+  State.undoStack.push(adjDragSnapshot);
+  if (State.undoStack.length > 50) State.undoStack.shift();
+  adjDragSnapshot = null;
+}
+function fmtAdjVal(key, v) {
+  const def = ADJUST_DEFS.find(d => d.key === key);
+  if (def && def.fmt) return def.fmt(v);
+  return (v > 0 ? "+" : "") + Math.round(v);
+}
+
+function buildAdjustPanel() {
+  const list = $("#adjust-list");
+  list.innerHTML = "";
+  for (const def of ADJUST_DEFS) {
+    if (def.group) {
+      const h = document.createElement("div");
+      h.className = "adj-group-title";
+      h.textContent = def.group;
+      list.appendChild(h);
+      continue;
+    }
+    const row = document.createElement("div");
+    row.className = "adj-row";
+    row.dataset.adj = def.key;
+    row.innerHTML =
+      `<div class="adj-label-row">` +
+        `<label data-adj="${def.key}" title="Double-click to reset">${def.label}</label>` +
+        `<span class="adj-val"></span>` +
+      `</div>` +
+      `<input type="range" data-adj="${def.key}" min="${def.min}" max="${def.max}" step="${def.step}" value="${State.adjustments[def.key]}" aria-label="${def.label}">`;
+    const input = row.querySelector("input");
+    const label = row.querySelector("label");
+    input.addEventListener("pointerdown", () => { if (!adjDragSnapshot) adjDragSnapshot = snapshotState(); });
+    input.addEventListener("keydown", () => { if (!adjDragSnapshot) adjDragSnapshot = snapshotState(); });
+    input.addEventListener("input", e => setAdjustment(def.key, parseFloat(e.target.value)));
+    input.addEventListener("change", commitAdjDrag);
+    label.addEventListener("dblclick", () => resetAdjustment(def.key));
+    list.appendChild(row);
+  }
+  syncAdjustUI();
+}
+
+function setAdjustment(key, value, opts = {}) {
+  State.adjustments[key] = value;
+  syncAdjustRow(key);
+  updateAdjustDot();
+  if (!opts.noSave) saveAdjustments();
+  requestRender();
+}
+function syncAdjustRow(key) {
+  const row = $(`#adjust-list .adj-row[data-adj="${key}"]`);
+  if (!row) return;
+  const input = row.querySelector("input");
+  const val = State.adjustments[key];
+  if (parseFloat(input.value) !== val) input.value = val;
+  setSliderPct(input);
+  row.querySelector(".adj-val").textContent = fmtAdjVal(key, val);
+  row.classList.toggle("modified", Math.abs(val - (ADJUST_DEFAULTS[key] || 0)) > 1e-6);
+}
+function syncAdjustUI() {
+  for (const def of ADJUST_DEFS) if (def.key) syncAdjustRow(def.key);
+  updateAdjustDot();
+}
+
+function resetAdjustment(key) {
+  if (Math.abs(State.adjustments[key] - (ADJUST_DEFAULTS[key] || 0)) < 1e-6) return;
+  pushUndo();
+  setAdjustment(key, ADJUST_DEFAULTS[key] || 0);
+}
+function resetAllAdjustments() {
+  const any = Object.keys(ADJUST_DEFAULTS).some(k => Math.abs(State.adjustments[k] - ADJUST_DEFAULTS[k]) > 1e-6);
+  if (!any) return;
+  pushUndo();
+  Object.assign(State.adjustments, ADJUST_DEFAULTS);
+  syncAdjustUI();
+  saveAdjustments();
+  requestRender();
+  Toast.show("Adjustments reset", "All sliders back to default.", "info", 2000);
+}
+// Apply a whole snapshot (undo / restore-from-storage), without pushing undo
+function applyAdjustments(values, opts = {}) {
+  Object.assign(State.adjustments, ADJUST_DEFAULTS, values || {});
+  syncAdjustUI();
+  if (!opts.noSave) saveAdjustments();
+  requestRender();
+}
+
+let adjSaveTimer = null;
+function saveAdjustments() {
+  clearTimeout(adjSaveTimer);
+  adjSaveTimer = setTimeout(() => {
+    DB.put("settings", { key: "adjustments", value: { ...State.adjustments } }).catch(() => {});
+  }, 250);
+}
+function updateAdjustDot() {
+  const any = Object.keys(ADJUST_DEFAULTS).some(k => Math.abs(State.adjustments[k] - ADJUST_DEFAULTS[k]) > 1e-6);
+  $("#btn-toggle-adjust").classList.toggle("has-adjust", any);
+}
+
+$("#btn-reset-adjust").addEventListener("click", resetAllAdjustments);
+$("#btn-reset-adjust-top").addEventListener("click", resetAllAdjustments);
+
+/* Topbar toggle — desktop collapses the side panel; mobile opens the sheet tab */
+$("#btn-toggle-adjust").addEventListener("click", () => {
+  if (matchMedia("(max-width: 1023px)").matches) { openSheet(true, "adjust"); return; }
+  const ws = $("#workspace");
+  ws.classList.toggle("adjust-collapsed");
+  $("#btn-toggle-adjust").classList.toggle("active", !ws.classList.contains("adjust-collapsed"));
+  setTimeout(() => { resizeCanvas(); requestRender(); }, 300);
+});
+
+/* ============================================================
+   Panel toggle / resize / bottom sheet
+   ============================================================ */
+$("#btn-toggle-panel").addEventListener("click", () => {
+  if (matchMedia("(max-width: 1023px)").matches) { openSheet(true, "lut"); return; }
+  $("#workspace").classList.toggle("panel-collapsed");
+  setTimeout(() => { resizeCanvas(); requestRender(); }, 300);
+});
+(() => {
+  const rs = $("#panel-resizer");
+  let drag = false;
+  rs.addEventListener("pointerdown", e => { drag = true; rs.setPointerCapture(e.pointerId); });
+  rs.addEventListener("pointermove", e => {
+    if (!drag) return;
+    const w = clamp(e.clientX, 180, 340);
+    document.documentElement.style.setProperty("--panel-w", w + "px");
+    DB.put("settings", { key: "panelWidth", value: w });
+    resizeCanvas();
+  });
+  rs.addEventListener("pointerup", () => { drag = false; requestRender(); });
+})();
+
+function syncSheetTabs() {
+  $$(".sheet-tabs button").forEach(b => b.classList.toggle("active", b.dataset.tab === State.sheetTab));
+}
+function openSheet(open, which) {
+  if (open) {
+    State.sheetTab = which || State.sheetTab || "lut";
+    $("#lut-panel").classList.toggle("sheet-open", State.sheetTab === "lut");
+    $("#adjust-panel").classList.toggle("sheet-open", State.sheetTab === "adjust");
+    syncSheetTabs();
+    const bd = $("#sheet-backdrop");
+    bd.style.display = "block"; requestAnimationFrame(() => bd.classList.add("shown"));
+  } else {
+    $("#lut-panel").classList.remove("sheet-open");
+    $("#adjust-panel").classList.remove("sheet-open");
+    const bd = $("#sheet-backdrop");
+    bd.classList.remove("shown"); setTimeout(() => bd.style.display = "none", 260);
+  }
+}
+$("#fab-luts").addEventListener("click", () => openSheet(true, State.sheetTab));
+$("#sheet-backdrop").addEventListener("click", () => openSheet(false));
+$$(".sheet-tabs button").forEach(b => b.addEventListener("click", () => openSheet(true, b.dataset.tab)));
+// Swipe down on a grip to dismiss the active sheet
+[["#lut-panel", "#sheet-grip"], ["#adjust-panel", "#adjust-grip"]].forEach(([panelSel, gripSel]) => {
+  let startY = null;
+  const panel = $(panelSel), grip = $(gripSel);
+  grip.addEventListener("touchstart", e => { startY = e.touches[0].clientY; }, { passive: true });
+  grip.addEventListener("touchmove", e => {
+    if (startY == null) return;
+    const dy = Math.max(0, e.touches[0].clientY - startY);
+    panel.style.transform = `translateY(${dy}px)`;
+  }, { passive: true });
+  grip.addEventListener("touchend", e => {
+    if (startY == null) return;
+    const dy = e.changedTouches[0].clientY - startY;
+    panel.style.transform = "";
+    if (dy > 70) openSheet(false);
+    startY = null;
+  });
+});
+
+/* ============================================================
+   Search / tag filter
+   ============================================================ */
+$("#lut-search").addEventListener("input", e => { State.searchTerm = e.target.value; renderLutList(); });
+$$("#tag-chips .chip").forEach(c => c.addEventListener("click", () => {
+  const tag = c.dataset.tag;
+  State.tagFilter = State.tagFilter === tag ? null : tag;
+  $$("#tag-chips .chip").forEach(x => x.classList.toggle("active", x.dataset.tag === State.tagFilter));
+  renderLutList();
+}));
+
+/* ============================================================
+   Drag & drop — files onto panel / stage / filmstrip
+   ============================================================ */
+function classifyDrop(files) {
+  const luts = [], media = [];
+  for (const f of files) (LUT_EXTS.has(ext(f.name)) && !f.type.startsWith("video/") ? luts : media).push(f);
+  return { luts, media };
+}
+for (const zone of [stage, $("#filmstrip"), $("#lut-panel")]) {
+  zone.addEventListener("dragover", e => {
+    e.preventDefault();
+    if (zone === stage) stage.classList.add("drag-over");
+  });
+  zone.addEventListener("dragleave", () => stage.classList.remove("drag-over"));
+  zone.addEventListener("drop", async e => {
+    e.preventDefault();
+    stage.classList.remove("drag-over");
+    // LUT card dragged from panel onto canvas → apply
+    const lutId = e.dataTransfer.getData("text/lut-id");
+    if (lutId && zone === stage) { selectLut(lutId); return; }
+    const files = [...(e.dataTransfer.files || [])];
+    if (!files.length) return;
+    let { luts, media } = classifyDrop(files);
+    if (zone === $("#lut-panel")) { luts = files; media = []; }
+    // PNG ambiguity: dropped on LUT panel = Hald, elsewhere = image
+    if (luts.length) await addLutFiles(luts);
+    if (media.length) await addMediaFiles(media);
+  });
+}
+
+/* File pickers */
+$("#btn-add-lut").addEventListener("click", () => $("#file-lut").click());
+$("#file-lut").addEventListener("change", e => { addLutFiles([...e.target.files]); e.target.value = ""; });
+for (const id of ["#btn-add-media", "#btn-empty-add"])
+  $(id).addEventListener("click", () => $("#file-media").click());
+$("#empty-drop").addEventListener("click", e => { if (!e.target.closest("button")) $("#file-media").click(); });
+$("#file-media").addEventListener("change", e => { addMediaFiles([...e.target.files]); e.target.value = ""; });
+
+/* ============================================================
+   Export
+   ============================================================ */
+function download(blob, name) {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = name;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+}
+function exportImage(format = "png", quality = 0.92, suffix = "graded") {
+  const m = activeMedia();
+  if (!m) { Toast.show("Nothing to export", "Add media first.", "warning"); return; }
+  // Render the full-resolution image offscreen with graded mode
+  const out = document.createElement("canvas");
+  out.width = m.w; out.height = m.h;
+  // Use a temp engine sized to image for max fidelity
+  try {
+    const tmp = new LUTEngine(out);
+    const src = m.kind === "video" ? hiddenVideo : m.bitmap;
+    tmp.setImage(src, m.w, m.h, false);
+    const lut = activeLut();
+    const entry = lut && lut.data ? tmp.getLutEntry(lut) : null;
+    tmp.draw({
+      lutEntry: entry, strength: entry ? State.strength : 0,
+      mode: 0, split: 0.5, zoom: 1, pan: [0, 0],
+      linear: State.linearLight, viewport: [0, 0, m.w, m.h],
+      adj: State.adjustments, time: performance.now()
+    });
+    const mime = format === "png" ? "image/png" : format === "webp" ? "image/webp" : "image/jpeg";
+    out.toBlob(b => {
+      if (!b) { Toast.show("Export failed", "Canvas too large for this browser.", "error"); return; }
+      const base = m.name.replace(/\.[^.]+$/, "");
+      download(b, `${base}_${suffix}.${format === "jpeg" ? "jpg" : format}`);
+      Toast.show("Exported", `${base}_${suffix}.${format} — ${m.w}×${m.h}`, "success");
+    }, mime, quality);
+  } catch (err) {
+    Toast.show("Export failed", err.message, "error");
+  }
+}
+function exportActiveCube() {
+  const l = activeLut();
+  if (!l || !l.data) { Toast.show("No active LUT", "", "warning"); return; }
+  let txt = `# Exported from LUTStudio\nTITLE "${l.name}"\n`;
+  const d = l.data;
+  if (l.type === "1D") {
+    txt += `LUT_1D_SIZE ${l.size}\n`;
+    for (let i = 0; i < l.size; i++) txt += `${d[i*3].toFixed(6)} ${d[i*3+1].toFixed(6)} ${d[i*3+2].toFixed(6)}\n`;
+  } else {
+    txt += `LUT_3D_SIZE ${l.size}\n`;
+    const n = l.size ** 3;
+    const parts = new Array(n);
+    for (let i = 0; i < n; i++) parts[i] = `${d[i*3].toFixed(6)} ${d[i*3+1].toFixed(6)} ${d[i*3+2].toFixed(6)}`;
+    txt += parts.join("\n") + "\n";
+  }
+  download(new Blob([txt], { type: "text/plain" }), l.name.replace(/[^\w\- ]+/g, "") + ".cube");
+  Toast.show("LUT exported", l.name + ".cube", "success");
+}
+let recorder = null;
+function toggleVideoRecord() {
+  const m = activeMedia();
+  if (!m || m.kind !== "video") { Toast.show("Select a video first", "", "warning"); return; }
+  if (recorder) { recorder.stop(); return; }
+  if (!glCanvas.captureStream) { Toast.show("Not supported", "MediaRecorder canvas capture isn't available in this browser.", "error"); return; }
+  State.mode = "graded"; syncModeButtons(); requestRender();
+  const stream = glCanvas.captureStream(30);
+  const mime = MediaRecorder.isTypeSupported("video/webm;codecs=vp9") ? "video/webm;codecs=vp9" : "video/webm";
+  recorder = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 12_000_000 });
+  const chunks = [];
+  recorder.ondataavailable = e => e.data.size && chunks.push(e.data);
+  recorder.onstop = () => {
+    download(new Blob(chunks, { type: "video/webm" }), m.name.replace(/\.[^.]+$/, "") + "_graded.webm");
+    Toast.show("Recording saved", "Graded .webm exported.", "success");
+    recorder = null;
+    $("#btn-export-video").textContent = "Record graded video (.webm)";
+    hiddenVideo.onended = null;
+  };
+  hiddenVideo.currentTime = 0;
+  hiddenVideo.play();
+  recorder.start();
+  hiddenVideo.onended = () => recorder && recorder.stop();
+  $("#btn-export-video").textContent = "■ Stop recording";
+  Toast.show("Recording…", "Capturing the graded canvas in real time. Press the button again (or let the video end) to finish.", "info", 5000);
+  closeModal($("#export-modal"));
+}
+
+/* Library .zip import/export */
+$("#btn-export-lib").addEventListener("click", async () => {
+  if (!window.JSZip) { Toast.show("Offline", "ZIP library didn't load — connect once to enable .zip export.", "warning"); return; }
+  if (!State.luts.length) { Toast.show("Library is empty", "", "info"); return; }
+  const zip = new JSZip();
+  for (const l of State.luts) zip.file(`${l.name}.${l.ext || "cube"}`, l.raw);
+  const blob = await zip.generateAsync({ type: "blob" });
+  download(blob, "LUTStudio-library.zip");
+  Toast.show("Library exported", `${State.luts.length} LUTs zipped.`, "success");
+});
+$("#btn-import-lib").addEventListener("click", () => {
+  if (!window.JSZip) { Toast.show("Offline", "ZIP library didn't load — connect once to enable import.", "warning"); return; }
+  $("#file-zip").click();
+});
+$("#file-zip").addEventListener("change", async e => {
+  const f = e.target.files[0]; e.target.value = "";
+  if (!f) return;
+  const zip = await JSZip.loadAsync(f);
+  const files = [];
+  for (const [name, entry] of Object.entries(zip.files)) {
+    if (entry.dir || !LUT_EXTS.has(ext(name)) && !["png","tiff","tif"].includes(ext(name))) continue;
+    const blob = await entry.async("blob");
+    files.push(new File([blob], name.split("/").pop()));
+  }
+  if (files.length) await addLutFiles(files);
+  else Toast.show("No LUTs found in zip", "", "warning");
+});
+$("#btn-clear-lib").addEventListener("click", async () => {
+  if (!State.luts.length) return;
+  if (!confirm(`Delete all ${State.luts.length} LUTs from your library? This can't be undone.`)) return;
+  await DB.clear("luts");
+  State.luts.forEach(l => engine && engine.evictLut(l.id));
+  State.luts = [];
+  State.activeLutId = null;
+  $("#active-lut-name").textContent = "None";
+  renderLutList(); requestRender();
+  Toast.show("Library cleared", "", "info");
+});
+
+/* ============================================================
+   Modals
+   ============================================================ */
+function openModal(m) { m.classList.add("open"); requestAnimationFrame(() => m.classList.add("shown")); }
+function closeModal(m) { m.classList.remove("shown"); setTimeout(() => m.classList.remove("open"), 210); }
+$$(".modal-backdrop").forEach(m => {
+  m.addEventListener("click", e => { if (e.target === m || e.target.closest("[data-close]")) closeModal(m); });
+});
+$("#btn-export").addEventListener("click", () => openModal($("#export-modal")));
+$("#btn-settings").addEventListener("click", async () => {
+  $("#renderer-info").textContent = engine ? (engine.unsupported ? "WebGL unavailable" :
+    engine.isGL2 ? "WebGL 2.0 — native 3D textures" : "WebGL 1.0 — 2D atlas fallback") : "—";
+  if (navigator.storage?.estimate) {
+    const est = await navigator.storage.estimate();
+    $("#storage-info").textContent = `${fmtBytes(est.usage || 0)} of ${fmtBytes(est.quota || 0)}`;
+  }
+  openModal($("#settings-modal"));
+});
+$("#export-format").addEventListener("change", e => {
+  $("#jpeg-quality-field").style.display = e.target.value === "jpeg" ? "" : "none";
+});
+$("#export-quality").addEventListener("input", e => { $("#export-quality-val").textContent = e.target.value; setSliderPct(e.target); });
+$("#btn-do-export").addEventListener("click", () => {
+  exportImage($("#export-format").value, $("#export-quality").value / 100);
+  closeModal($("#export-modal"));
+});
+$("#btn-export-cube").addEventListener("click", exportActiveCube);
+$("#btn-export-video").addEventListener("click", toggleVideoRecord);
+$("#set-linear").addEventListener("change", e => {
+  State.linearLight = e.target.checked;
+  DB.put("settings", { key: "linearLight", value: State.linearLight });
+  updateInfoOverlay(); requestRender();
+});
+$("#set-default-strength").addEventListener("input", e => {
+  $("#set-strength-val").textContent = e.target.value + "%";
+  setSliderPct(e.target);
+  DB.put("settings", { key: "defaultStrength", value: e.target.value / 100 });
+});
+$("#btn-histogram").addEventListener("click", () => {
+  $("#histogram-wrap").classList.toggle("hidden");
+  scheduleHistogram();
+});
+$("#btn-hist-close").addEventListener("click", () => $("#histogram-wrap").classList.add("hidden"));
+
+/* ============================================================
+   Keyboard shortcuts
+   ============================================================ */
+document.addEventListener("keydown", e => {
+  if (e.target.matches("input, textarea, select")) return;
+  const usable = State.luts.filter(l => l.data);
+  const k = e.key;
+  if (k === "[" || k === "]") {
+    if (!usable.length) return;
+    const i = usable.findIndex(l => l.id === State.activeLutId);
+    const next = usable[(i + (k === "]" ? 1 : -1) + usable.length) % usable.length];
+    selectLut(next.id);
+  } else if (k === "ArrowLeft" || k === "ArrowRight") {
+    const m = activeMedia();
+    if (m && m.kind === "video") { frameStep(k === "ArrowRight" ? 1 : -1); return; }
+    if (State.media.length < 2) return;
+    const i = State.media.findIndex(x => x.id === State.activeMediaId);
+    selectMedia(State.media[(i + (k === "ArrowRight" ? 1 : -1) + State.media.length) % State.media.length].id);
+  } else if (k === " ") {
+    e.preventDefault(); togglePlay();
+  } else if (k.toLowerCase() === "s") {
+    State.mode = State.mode === "split" ? "graded" : "split";
+    syncModeButtons(); requestRender(); wakeSplitLabels();
+  } else if (k.toLowerCase() === "e") {
+    exportImage($("#export-format").value, $("#export-quality").value / 100);
+  } else if (k.toLowerCase() === "f") {
+    const l = activeLut();
+    if (l) { l.favorite = !l.favorite; DB.put("luts", l); renderLutList(); }
+  } else if (k.toLowerCase() === "h") {
+    $("#histogram-wrap").classList.toggle("hidden"); scheduleHistogram();
+  } else if (/^[0-9]$/.test(k)) {
+    setStrength(parseInt(k) / 10);
+    pushUndo();
+  } else if ((e.ctrlKey || e.metaKey) && k.toLowerCase() === "z") {
+    e.preventDefault();
+    const prev = State.undoStack.pop();
+    if (prev) {
+      State.activeLutId = prev.lutId;
+      setStrength(prev.strength, true);
+      if (prev.adjustments) applyAdjustments(prev.adjustments);
+      $("#active-lut-name").textContent = activeLut()?.name || "None";
+      renderLutList(); updateInfoOverlay(); requestRender();
+    }
+  }
+});
+
+/* ============================================================
+   Init
+   ============================================================ */
+(async function init() {
+  // Renderer
+  try {
+    engine = new LUTEngine(glCanvas);
+    if (engine.unsupported) {
+      Toast.show("WebGL unavailable", "Real-time preview needs WebGL. Enable hardware acceleration in your browser settings.", "error", 9000);
+    } else if (!engine.isGL2) {
+      Toast.show("WebGL 1.0 mode", "3D LUTs run through a 2D atlas fallback — slightly softer interpolation.", "info", 5000);
+    }
+  } catch (err) {
+    Toast.show("Renderer failed to start", err.message, "error", 9000);
+  }
+
+  // Persistence
+  try {
+    await DB.open();
+    const settings = await DB.getAll("settings");
+    for (const s of settings) {
+      if (s.key === "defaultStrength") { setStrength(s.value, true); $("#set-default-strength").value = s.value * 100; $("#set-strength-val").textContent = Math.round(s.value*100)+"%"; }
+      if (s.key === "linearLight") { State.linearLight = s.value; $("#set-linear").checked = s.value; }
+      if (s.key === "panelWidth") document.documentElement.style.setProperty("--panel-w", s.value + "px");
+      if (s.key === "adjustments" && s.value) Object.assign(State.adjustments, ADJUST_DEFAULTS, s.value);
+    }
+    await loadLibrary();
+    rehydrateLuts();
+    if (State.luts.length) {
+      const recent = [...State.luts].filter(l => l.data).sort((a, b) => (b.lastUsed||0) - (a.lastUsed||0))[0];
+      if (recent) selectLut(recent.id, false);
+    }
+  } catch (err) {
+    Toast.show("Storage unavailable", "LUTs won't persist this session (private browsing?). " + err.message, "warning", 7000);
+  }
+
+  // Build adjustments panel from restored (or default) state
+  buildAdjustPanel();
+  $("#btn-toggle-adjust").classList.toggle("active", !$("#workspace").classList.contains("adjust-collapsed"));
+
+  // Sliders initial fill
+  $$('input[type=range]').forEach(setSliderPct);
+
+  // Resize + loop
+  new ResizeObserver(() => { resizeCanvas(); layoutSplitHandle(); requestRender(); }).observe(stage);
+  resizeCanvas();
+  syncModeButtons();
+  wakeSplitLabels();
+  render();
+
+  // Re-fade info on activity
+  stage.addEventListener("pointermove", () => { if (activeMedia()) updateInfoOverlay(); }, { passive: true });
+})();
 </script>
 </body>
 </html>
